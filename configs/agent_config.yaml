@@ -1,0 +1,42 @@
+# Agent Configuration
+# Agent 配置文件
+
+agent:
+  name: "intelligent-teaching-agent"
+  model: "qwen-plus"
+  temperature: 0.0
+  
+  # Tool Configuration
+  tools:
+    web_search:
+      enabled: true
+      max_results: 5
+    arxiv_search:
+      enabled: true
+      max_results: 3
+    content_fetcher:
+      enabled: true
+      timeout: 30
+      
+  # Memory Configuration
+  memory:
+    short_term:
+      max_turns: 20
+    long_term:
+      enabled: true
+      storage_path: "./data/memory"
+      
+  # Skill Configuration
+  skills:
+    doc_review:
+      enabled: true
+    research:
+      enabled: true
+      
+  # Evaluation Configuration
+  evaluation:
+    enabled: true
+    metrics:
+      - accuracy
+      - tool_call_efficiency
+      - response_quality
