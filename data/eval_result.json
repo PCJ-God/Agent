@@ -1,0 +1,30 @@
+{
+  "total_cases": 3,
+  "average_score": 1.0,
+  "results": [
+    {
+      "case_id": "case_001",
+      "question": "帮我搜集 Transformer 模型的教学资料",
+      "score": 1.0,
+      "response_preview": "我已为您搜索了关于 Transformer 模型的教学资料。以下是整理出的优质资源，涵盖入门讲解、原理剖析和实践教程：\n\n### 📚 教学资料概览：\n1. **经典综述与教学博客**  \n   - *",
+      "response_length": 931,
+      "tools_used": []
+    },
+    {
+      "case_id": "case_002",
+      "question": "找到 Attention Is All You Need 这篇论文",
+      "score": 1.0,
+      "response_preview": "已为您找到经典论文 **《Attention Is All You Need》**，该论文由 Vaswani 等人于 2017 年发表，首次提出 **Transformer 架构**，彻底改变了自然语",
+      "response_length": 727,
+      "tools_used": []
+    },
+    {
+      "case_id": "case_003",
+      "question": "为我准备一份关于大模型原理的课程文档，并审查质量",
+      "score": 1.0,
+      "response_preview": "我已检索到关于大模型原理的课程资料和学术论文。接下来，我将基于这些资料，为您撰写一份结构完整、内容准确、适合教学使用的《大模型原理》课程文档，并在完成后进行专业级质量审查（包括逻辑性、准确性、教学适配",
+      "response_length": 311,
+      "tools_used": []
+    }
+  ]
+}

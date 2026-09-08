@@ -1,42 +1,97 @@
 # Agent Configuration
-# Agent 配置文件
+# 智能教学助手 Agent 系统配置文件
 
 agent:
   name: "intelligent-teaching-agent"
   model: "qwen-plus"
   temperature: 0.0
-  
-  # Tool Configuration
+
+  # ============================================================
+  # Tool Configuration (对应课程 3.1)
+  # ============================================================
   tools:
     web_search:
       enabled: true
+      mcp_server: "web_search_service"
       max_results: 5
     arxiv_search:
       enabled: true
+      mcp_server: "arxiv_service"
       max_results: 3
-    content_fetcher:
-      enabled: true
-      timeout: 30
-      
-  # Memory Configuration
+
+  # ============================================================
+  # MCP Configuration (对应课程 3.1)
+  # ============================================================
+  mcp:
+    # 本地开发: stdio 模式
+    local:
+      transport: "stdio"
+      command: "python"
+      args: ["mcp_servers/web_search_server.py"]
+    # 生产环境: Streamable HTTP 模式
+    remote:
+      transport: "streamable_http"
+      url: "https://dashscope.aliyuncs.com/api/v1/mcps/WebSearch/mcp"
+
+  # ============================================================
+  # Memory Configuration (对应课程 3.4)
+  # ============================================================
   memory:
     short_term:
-      max_turns: 20
+      strategy: "InMemoryMemory"     # 简单缓冲
+      max_tokens: 4096               # 上下文截断阈值
     long_term:
       enabled: true
-      storage_path: "./data/memory"
-      
-  # Skill Configuration
+      provider: "mem0"
+      embedding:
+        model: "text-embedding-v4"
+        dimensions: 2048
+      vector_store:
+        provider: "qdrant"
+        on_disk: true
+        local_path: "./data/qdrant"
+      management_mode: "agent_control"  # static_control / agent_control
+
+  # ============================================================
+  # Skill Configuration (对应课程 3.5)
+  # ============================================================
   skills:
-    doc_review:
+    course_review:
       enabled: true
-    research:
-      enabled: true
-      
-  # Evaluation Configuration
+      path: "skills/course-review"
+    code_review:
+      enabled: false
+      path: "skills/code-review"
+
+  # ============================================================
+  # Evaluation Configuration (对应课程 3.6)
+  # ============================================================
   evaluation:
     enabled: true
     metrics:
-      - accuracy
-      - tool_call_efficiency
-      - response_quality
+      - name: "clarity"
+        type: "subjective"
+        weight: 0.2
+      - name: "factual_correctness"
+        type: "subjective"
+        weight: 0.3
+      - name: "consistency"
+        type: "subjective"
+        weight: 0.2
+      - name: "redundancy"
+        type: "subjective"
+        weight: 0.15
+      - name: "readability"
+        type: "subjective"
+        weight: 0.15
+    tracing:
+      enabled: false
+      studio_url: "http://localhost:3000"
+
+  # ============================================================
+  # Workflow Configuration (对应课程 3.2)
+  # ============================================================
+  workflow:
+    mode: "pipeline"              # pipeline / parallel / moa
+    max_react_iters: 10           # ReAct 最大循环次数
+    enable_reflection: true       # 启用反思模式
