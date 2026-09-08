@@ -1,267 +1,289 @@
-# 智能教学助手 Agent 系统
+# Agent 智能体系统
 
-> 基于大模型的智能化教学辅助平台 —— 从"回答问题"到"解决问题"的端到端 Agent 解决方案
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## 项目背景
+## 📖 项目简介
 
-在企业数字化转型过程中,传统的答疑系统存在显著局限:只能基于知识库被动回答,无法主动调用外部工具获取实时信息,更不能规划执行复杂任务。本项目设计并实现了一套完整的 **Agent 智能体系统**,将大语言模型从"顾问"升级为能真正"动手解决问题"的智能助手。
+本项目是一个基于 **Agent 架构** 的生产级智能教学助手系统，源自阿里云大模型 ACP 认证课程 C3 的实践与扩展。面向教学辅助场景，帮助教师和学生通过自然语言交互完成资料搜集、文档审查、课程规划等复杂任务。
 
-系统采用 **AgentScope** 生产级框架,集成 **Function Calling**、**MCP(Model Context Protocol)**、**ReAct 规划执行**、**多Agent协作**、**Memory记忆管理**、**Skill技能固化** 等核心技术,构建了从工具调用到自主规划的完整能力链路。
+项目从课程 Notebook 教学代码演进为**生产级 Python 包**，具备模块化架构、工具编排、多 Agent 协作、记忆管理和自动化评测能力。
 
-## 核心能力
+## ✨ 核心特性
 
-### 1. 工具调用与外部集成 (Tool Integration)
-- **Function Calling 机制**: 实现标准化的工具定义、选择、执行与结果解析全流程
-- **MCP 协议接入**: 采用 Model Context Protocol 实现工具提供方与消费方的解耦,支持工具动态发现与热插拔
-- **多传输模式支持**: stdio(本地调试) + Streamable HTTP(生产环境)双模式适配
-- **结构化输出校验**: Pydantic模型验证 + 引导-校验-重试闭环,确保工具调用参数100%准确
+### Agent 引擎
+- **ReAct 循环**：思考 → 行动 → 观察，支持最大循环次数和超时控制
+- **Function Calling**：工具自动注册（从 docstring 解析 JSON Schema），引导-校验-重试闭环
+- **MCP 协议集成**：支持 stdio（本地开发）和 Streamable HTTP（生产环境）两种传输模式
 
-### 2. 智能规划与自主执行 (Planning & Execution)
-- **ReAct Agent**: 思考(Thought) → 行动(Action) → 观察(Observation)循环模式
-- **工作流编排**: 复杂任务的多步骤规划、执行与结果验证
-- **自主决策**: Agent根据任务状态自主判断是否需要调用工具或给出最终答案
-- **错误恢复**: 工具调用失败时的自动重试与降级策略
+### 编排与协作
+- **规划执行**：PlanNotebook 计划生成与逐步执行，支持动态工具创建
+- **多 Agent 协作**：Hierarchical（层级分发）+ Co-creation（MsgHub 圆桌讨论）两种模式
+- **反思模式**：Self-Review（单步自查）+ External Feedback（工具验证）
 
-### 3. 多 Agent 协作架构 (Multi-Agent Collaboration)
-- **角色分工**: Research Agent、Review Agent、Summary Agent等专业角色协同
-- **任务分发**: 复杂任务自动拆解与多Agent并行处理
-- **结果聚合**: 多来源信息的整合与去重优化
+### 记忆与技能
+- **记忆管理**：短期记忆（上下文截断/滚动摘要）+ 长期记忆（Mem0 + Qdrant 向量存储）
+- **主动记忆**：Agent 自主决定何时保存和召回（agent_control 模式）
+- **Skill 系统**：SKILL.md 文件化定义 + 渐进式披露 + Skills-as-Code 工作流
 
-### 4. Memory 记忆管理系统 (Memory Management)
-- **短期记忆**: 对话上下文与任务状态维护
-- **长期记忆**: 跨会话经验积累与知识沉淀
-- **主动记忆**: Agent自主判断哪些经验需要保存与复用
-- **记忆检索**: 基于语义相似度的历史经验快速召回
+### 工程化
+- **自动化评测**：端到端 + 白盒化，支持 Task + MetricBase + LLMEvalMetric
+- **CLI 交互界面**：支持多种 Agent 模式和策略开关
+- **Web API 服务**：FastAPI + REST 端点 + SSE 流式输出
+- **配置管理**：YAML + 环境变量，集中管理所有参数
 
-### 5. Skill 技能固化体系 (Skill System)
-- **Prompt → Skill 演进**: 将调试好的工作流固化为可复用技能模块
-- **技能库管理**: 文档审查、代码Review、资料搜集等标准化技能
-- **参数化调用**: 通过统一接口实现技能的灵活组合与编排
-
-### 6. 评测驱动开发 (Evaluation-Driven Development)
-- **端到端评测**: 完整任务链路的准确性与效率评估
-- **白盒化分析**: 工具调用路径、ReAct循环次数、决策质量等细粒度指标
-- **持续改进**: 基于评测结果迭代优化 Agent 行为与工具设计
-
-## 技术架构
+## 🏗️ 系统架构
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    用户交互层 (User Interface)            │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ Research     │  │ Review       │  │ Summary      │  │
-│  │ Agent        │  │ Agent        │  │ Agent        │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
-│         │                 │                 │           │
-│  ┌──────┴─────────────────┴─────────────────┴───────┐  │
-│  │           ReAct Agent 核心引擎                     │  │
-│  │  ┌─────────┐  ┌──────────┐  ┌───────────────┐   │  │
-│  │  │ Thought │→ │ Action   │→ │ Observation   │   │  │
-│  │  └─────────┘  └──────────┘  └───────────────┘   │  │
-│  └──────────────────────┬──────────────────────────┘  │
-│                         │                              │
-│  ┌──────────────────────┴──────────────────────────┐  │
-│  │              Toolkit (工具集)                    │  │
-│  │  ┌─────────┐ ┌──────────┐ ┌──────────────────┐ │  │
-│  │  │WebSearch│ │ Arxiv    │ │Content Fetcher   │ │  │
-│  │  │MCP      │ │Search MCP│ │MCP / Native      │ │  │
-│  │  └─────────┘ └──────────┘ └──────────────────┘ │  │
-│  └─────────────────────────────────────────────────┘  │
-│                         │                              │
-│  ┌──────────────────────┴──────────────────────────┐  │
-│  │           Memory & Skill 管理层                  │  │
-│  │  ┌──────────────┐  ┌──────────────────────┐    │  │
-│  │  │Short/Long Term│  │Skill Registry &      │    │  │
-│  │  │Memory Store   │  │Workflow Manager      │    │  │
-│  │  └──────────────┘  └──────────────────────┘    │  │
-│  └─────────────────────────────────────────────────┘  │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│              外部服务层 (External Services)              │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │DashScope │ │WebSearch │ │ Arxiv    │ │Internal  │  │
-│  │LLM API   │ │MCP Server│ │MCP       │ │Knowledge │  │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        用户交互层                                │
+│  ┌──────────────┐  ┌──────────────┐                             │
+│  │  CLI 交互界面 │  │  Web API 服务 │                             │
+│  │ (run_agent.py)│  │ (FastAPI)    │                             │
+│  └──────┬───────┘  └──────┬───────┘                             │
+└─────────┼────────────────┼──────────────────────────────────────┘
+          │                │
+┌─────────┼────────────────┼──────────────────────────────────────┐
+│         ▼       应用逻辑层        ▼                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │  Agent 引擎   │  │  编排与协作   │  │  记忆管理     │           │
+│  │ (ReActAgent) │  │ (PlanNotebook │  │ (Mem0+Qdrant) │           │
+│  │              │  │  MsgHub)      │  │              │           │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
+│         │                 │                 │                    │
+│  ┌──────┴─────────────────┴─────────────────┴──────┐            │
+│  │              技能与工具层                        │            │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │            │
+│  │  │ 工具管理  │  │ Skill 库 │  │ MCP 客户端   │  │            │
+│  │  │(自动注册) │  │(渐进披露)│  │(stdio/HTTP)  │  │            │
+│  │  └──────────┘  └──────────┘  └──────────────┘  │            │
+│  └─────────────────────────────────────────────────┘            │
+└─────────┼───────────────────────────────────────────────────────┘
+          │
+┌─────────┼───────────────────────────────────────────────────────┐
+│         ▼       评测与存储层      ▼                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │  自动化评测   │  │  向量存储     │  │  技能存储     │           │
+│  │ (LLMEval)   │  │ (Qdrant)    │  │ (SKILL.md)   │           │
+│  └──────────────┘  └──────────────┘  └──────────────┘           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## 快速开始
+## 🚀 快速开始
 
-### 环境要求
-- Python 3.10+
-- 阿里云 DashScope API Key (通义千问模型调用)
+### 1. 环境准备
 
-### 安装依赖
 ```bash
+git clone <your-repo-url>
+cd Agent
+
+conda create -n agent_learn python=3.10
+conda activate agent_learn
 pip install -r requirements.txt
 ```
 
-### 配置环境变量
+### 2. 配置 API Key
+
 ```bash
-export DASHSCOPE_API_KEY="your-api-key-here"
+cp .env.example .env
+# 编辑 .env，填入 DashScope API Key
 ```
 
-### 运行示例
+### 3. 运行 Agent
+
 ```bash
-# 启动本地 MCP Server (用于开发调试)
-python run_mcp_server.py
+# CLI 多轮交互 (默认 react 模式)
+python scripts/run_agent.py
 
-# 运行基础 Agent 示例
-python examples/basic_tool_call.py
+# CLI 多轮交互 (指定模式)
+python scripts/run_agent.py -i -m react         # ReAct 多轮对话 (保留上下文)
+python scripts/run_agent.py -i -m hierarchical  # 层级协作 多轮
+python scripts/run_agent.py -i -m cocreation    # 圆桌共创 多轮
 
-# 运行多Agent协作示例
-python examples/multi_agent_collaboration.py
-
-# 运行完整评测流程
-python scripts/run_evaluation.py
+# 单次提问 (不进入交互模式)
+python scripts/run_agent.py -q "帮我搜集 Transformer 模型的教学资料"
+python scripts/run_agent.py -q "帮我搜集..." -m hierarchical
 ```
 
-## 项目结构
+### 4. 启动 MCP Server
+
+```bash
+# 本地 MCP Server（用于开发调试）
+python scripts/run_mcp_server.py
+```
+
+### 5. 启动 Web API
+
+```bash
+python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+### 6. 运行评测
+
+```bash
+python scripts/run_eval.py              # 默认策略
+python scripts/run_eval.py --all        # 对比多种策略
+```
+
+## 📡 API 端点
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `GET /health` | GET | 健康检查 |
+| `POST /chat` | POST | 单轮问答 |
+| `POST /chat/stream` | POST (SSE) | 流式问答 |
+| `POST /agent/react` | POST | ReAct Agent |
+| `POST /agent/hierarchical` | POST | 层级协作 |
+| `POST /agent/cocreation` | POST | 圆桌共创 |
+
+## 📁 项目结构
 
 ```
 Agent/
-├── src/                          # 核心源代码
-│   ├── agents/                   # Agent 实现
-│   │   ├── react_agent.py        # ReAct Agent 核心
-│   │   ├── research_agent.py     # 研究助手 Agent
-│   │   ├── review_agent.py       # 文档审查 Agent
-│   │   └── multi_agent.py        # 多Agent协作编排
-│   ├── tools/                    # 工具函数
-│   │   ├── web_search.py         # 联网搜索
-│   │   ├── arxiv_search.py       # 学术论文搜索
-│   │   └── content_fetcher.py    # 网页内容获取
-│   ├── memory/                   # 记忆管理
-│   │   ├── short_term.py         # 短期记忆
-│   │   ├── long_term.py          # 长期记忆
-│   │   └── memory_manager.py     # 记忆管理器
-│   ├── skills/                   # 技能模块
-│   │   ├── skill_registry.py     # 技能注册表
-│   │   ├── doc_review.py         # 文档审查技能
-│   │   └── research.py           # 资料搜集技能
-│   └── evaluation/               # 评测系统
-│       ├── evaluator.py          # 评测引擎
-│       └── metrics.py            # 评测指标
-├── mcp_servers/                  # MCP Server 实现
-│   └── web_search_server.py      # WebSearch MCP Server
-├── examples/                     # 示例代码
-│   ├── basic_tool_call.py        # 基础工具调用
-│   ├── mcp_integration.py        # MCP 集成示例
-│   └── multi_agent_collaboration.py # 多Agent协作
-├── tests/                        # 测试用例
-│   ├── test_agents/              # Agent 测试
-│   ├── test_tools/               # 工具测试
-│   └── test_evaluation/          # 评测测试
-├── docs/                         # 文档
-│   ├── architecture.md           # 架构设计
-│   ├── api_reference.md          # API 参考
-│   └── deployment.md             # 部署指南
-├── configs/                      # 配置文件
-│   └── agent_config.yaml         # Agent 配置
-├── scripts/                      # 工具脚本
-│   ├── run_evaluation.py         # 运行评测
-│   └── deploy.sh                 # 部署脚本
-├── requirements.txt              # 依赖清单
-├── pyproject.toml                # 项目配置
-└── README.md                     # 项目说明
+├── README.md                    # 项目说明
+├── requirements.txt             # Python 依赖
+├── .env.example                 # 环境变量模板
+│
+├── data/                        # 数据
+│   ├── eval_cases.json          # 评测用例
+│   └── docs/                    # 测试文档
+│
+├── src/                         # 核心代码
+│   ├── config.py                # 配置管理
+│   ├── agent_engine/            # Agent 引擎
+│   │   ├── react_agent.py       #   ReAct Agent
+│   │   └── agent_factory.py     #   Agent 工厂
+│   ├── tools/                   # 工具管理
+│   │   ├── tool_manager.py      #   工具注册与调用
+│   │   └── mcp_client.py        #   MCP 客户端
+│   ├── orchestration/           # 编排与协作
+│   │   ├── planner.py           #   PlanNotebook 规划
+│   │   ├── hierarchical.py      #   层级协作
+│   │   └── cocreation.py        #   圆桌共创
+│   ├── memory/                  # 记忆管理
+│   │   ├── short_term.py        #   短期记忆
+│   │   └── long_term.py         #   长期记忆 (Mem0+Qdrant)
+│   ├── skills/                  # 技能管理
+│   │   ├── skill_loader.py      #   SKILL.md 加载
+│   │   └── skill_registry.py    #   技能注册表
+│   ├── evaluation/              # 自动化评测
+│   │   └── evaluator.py         #   Task + MetricBase
+│   └── api/                     # Web API
+│       ├── app.py               #   FastAPI 应用
+│       └── schemas.py           #   请求/响应模型
+│
+├── scripts/                     # 运行脚本
+│   ├── run_agent.py             # 命令行 Agent
+│   ├── run_mcp_server.py        # MCP Server
+│   └── run_eval.py              # 自动化评测
+│
+├── skills/                      # Skill 定义
+│   └── course-review/
+│       └── SKILL.md
+│
+└── mcp_servers/                 # MCP Server
+    └── web_search_server.py
 ```
 
-## 技术栈
+## 🧪 核心功能演示
 
-| 类别 | 技术 |
+### ReAct Agent
+
+```python
+from src.agent_engine.react_agent import create_react_agent
+from src.tools.tool_manager import register_default_tools
+
+agent = create_react_agent()
+register_default_tools(agent.toolkit)
+
+response = agent.run("帮我搜集 Transformer 模型的教学资料")
+print(response.content)
+```
+
+### 多 Agent 协作
+
+```python
+# 单次调用 (向后兼容)
+from src.orchestration.hierarchical import run_hierarchical
+from src.orchestration.cocreation import run_cocreation
+
+result = run_hierarchical("为'大模型原理'设计教学方案")
+result = run_cocreation("讨论 Transformer 课程的最佳设计方案")
+
+# 多轮对话 (保留上下文)
+from src.orchestration.hierarchical import HierarchicalTeam
+from src.orchestration.cocreation import CoCreationTeam
+import asyncio
+
+team = HierarchicalTeam()
+r1 = asyncio.run(team.chat("搜集资料"))
+r2 = asyncio.run(team.chat("你刚才做了什么？"))  # 能记住上下文
+
+team = CoCreationTeam()
+summary = asyncio.run(team.discuss("讨论课程设计方案"))
+```
+
+### Skill 使用
+
+```python
+from src.skills.skill_loader import SkillLoader
+from src.agent_engine.react_agent import create_react_agent
+
+loader = SkillLoader()
+agent = create_react_agent()
+
+# 注册 Skill（渐进式披露）
+loader.register_skill(agent.toolkit, "skills/course-review")
+
+# Agent 自动匹配并执行 Skill
+response = agent.run("请审查这份课程文档的质量")
+```
+
+## 📊 评测指标
+
+| 指标 | 说明 |
 |------|------|
-| **核心框架** | AgentScope (生产级 Agent 框架) |
-| **大模型服务** | 阿里云 DashScope (通义千问 qwen-plus) |
+| **Task Completion** | 任务完成率 |
+| **Tool Call Accuracy** | 工具调用准确率 |
+| **Response Quality** | 回复质量（LLM-as-a-Judge） |
+| **Efficiency** | 执行效率（循环次数、耗时） |
+
+## 🛠️ 技术栈
+
+| 类别 | 技术选型 |
+|------|----------|
+| **编程语言** | Python 3.10+ |
+| **Agent 框架** | AgentScope |
+| **大模型** | Qwen-Plus / Qwen3-Max |
 | **工具协议** | MCP (Model Context Protocol) |
-| **数据验证** | Pydantic (结构化输出) |
-| **异步编程** | asyncio (高并发工具调用) |
-| **配置管理** | YAML + 环境变量 |
-| **测试框架** | pytest |
+| **向量存储** | Qdrant |
+| **嵌入模型** | DashScope text-embedding-v4 |
+| **记忆管理** | Mem0 |
+| **Web 框架** | FastAPI + Uvicorn |
+| **配置管理** | PyYAML + python-dotenv |
 
-## 核心特性详解
+## 📚 学习资源
 
-### Function Calling 完整流程
+本项目基于 [阿里云大模型 ACP 认证课程](https://edu.aliyun.com/course/3130200) 开发：
 
-```
-用户请求 → 模型决策(调用哪个工具) → 参数生成 → 工具执行 → 结果返回 → 最终回复
-```
+- [C2_构造问答系统](https://edu.aliyun.com/course/3130200/) — RAG 原理与实践
+- [C3_构建 Agent 系统](https://edu.aliyun.com/course/3130200/) — Agent 设计与开发
+- [C4_交付上线](https://edu.aliyun.com/course/3130200/) — 模型优化与上线
 
-系统实现了从手动实现到 Function Calling 再到 MCP 协议的完整演进路径:
+## 🤝 贡献指南
 
-1. **硬编码阶段**: 直接调用预定义函数
-2. **意图识别**: 基于大模型的工具选择决策
-3. **结构化输出**: JSON Schema + Pydantic 验证
-4. **Function Calling**: 行业标准 API
-5. **MCP 协议**: 工具解耦与规模化管理
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 提交 Pull Request
 
-### ReAct Agent 工作模式
+## 📄 许可证
 
-```
-Thought: 我需要搜索最新资料
-Action: 调用 web_search 工具
-Observation: 获取到搜索结果
-Thought: 搜索结果已获取,可以生成回复
-Final Answer: 生成最终回复
-```
+MIT 许可证，详见 [LICENSE](LICENSE) 文件。
 
-### MCP 协议优势
+## 🙏 致谢
 
-通过 MCP 协议,系统实现了:
-- **工具提供方与消费方解耦**: 谁提供工具,谁定义工具
-- **动态工具发现**: Agent 启动时自动拉取可用工具清单
-- **热插拔**: 新增工具无需修改 Agent 代码
-- **标准化传输**: stdio(本地) + Streamable HTTP(生产)双模式
-
-## 典型应用场景
-
-### 场景 1: 课程资料搜集
-```python
-# Agent 自动调用 WebSearch MCP 获取最新资料
-user_request = "搜集 Transformer 模型的最新研究进展"
-response = await research_agent(user_request)
-# 自动完成: 搜索 → 筛选 → 整理 → 输出
-```
-
-### 场景 2: 学术论文查找
-```python
-# Agent 调用 Arxiv MCP 搜索论文
-request = "找到 'Attention Is All You Need' 这篇论文"
-response = await research_agent(request)
-# 返回: 论文信息 + 摘要 + 相关资源
-```
-
-### 场景 3: 多Agent协作文档审查
-```python
-# Research Agent 搜集资料 → Review Agent 审查 → Summary Agent 汇总
-complex_task = "审查这篇关于大模型的课程文档,并提供改进建议"
-response = await multi_agent_collaboration(complex_task)
-```
-
-## 性能指标
-
-- **工具调用准确率**: 98%+ (基于 Pydantic 验证)
-- **平均响应时间**: 2-5秒 (单工具), 5-15秒 (多工具)
-- **并发支持**: asyncio 异步高并发
-- **记忆检索精度**: 基于语义相似度召回
-
-## 开发路线图
-
-- [x] 基础工具调用与 Function Calling
-- [x] MCP 协议集成 (stdio + HTTP)
-- [x] ReAct Agent 规划执行
-- [x] 多 Agent 协作架构
-- [x] Memory 记忆管理
-- [x] Skill 技能固化
-- [x] 评测驱动开发
-- [ ] Harness Engineering (标准化验证闭环)
-- [ ] Loop Engineering (自主迭代优化)
-- [ ] 生产环境部署与监控
-
-## 许可证
-
-MIT License
-
-## 贡献指南
-
-欢迎提交 Issue 和 Pull Request!
+- [AgentScope](https://github.com/agentscope-ai/agentscope) — Agent 开发框架
+- [MCP](https://modelcontextprotocol.io/) — 模型上下文协议
+- [阿里云百炼](https://bailian.console.aliyun.com/) — 大模型服务平台

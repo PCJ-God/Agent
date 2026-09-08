@@ -1,0 +1,20 @@
+[
+  {
+    "id": "case_001",
+    "question": "帮我搜集 Transformer 模型的教学资料",
+    "expected_tools": ["web_search"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "case_002",
+    "question": "找到 Attention Is All You Need 这篇论文",
+    "expected_tools": ["search_arxiv_paper"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "case_003",
+    "question": "为我准备一份关于大模型原理的课程文档，并审查质量",
+    "expected_tools": ["web_search", "search_arxiv_paper"],
+    "difficulty": "hard"
+  }
+]
