@@ -18,7 +18,7 @@ from src.config import (
 
 async def create_mcp_client(
     name: str = "web_search_service",
-    transport: str = None,
+    transport: str = "",
 ) -> StdIOStatefulClient | HttpStatelessClient:
     """创建 MCP 客户端。
 

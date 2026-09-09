@@ -90,7 +90,7 @@ async def self_review_mode(original_content: str, draft_content: str) -> str:
     )
 
     result = await reviewer(review_msg)
-    return result.content
+    return result.content # type: ignore
 
 
 async def external_feedback_mode(original_content: str) -> str:
@@ -118,4 +118,4 @@ async def external_feedback_mode(original_content: str) -> str:
     )
 
     result = await writer(user_msg)
-    return result.content
+    return result.content # type: ignore

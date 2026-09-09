@@ -16,7 +16,7 @@ from agentscope.formatter import DashScopeChatFormatter, DashScopeMultiAgentForm
 from src.config import DASHSCOPE_API_KEY, LLM_MODEL
 
 
-def _create_agent(name: str, sys_prompt: str, model_name: str = None) -> ReActAgent:
+def _create_agent(name: str, sys_prompt: str, model_name: str = "") -> ReActAgent:
     """创建 Agent 的工厂函数。
 
     Args:
@@ -69,11 +69,11 @@ async def run_pipeline_workflow(content: str) -> str:
     agents = [code_extractor, code_validator, report_generator]
 
     result = await sequential_pipeline(
-        agents=agents,
+        agents=agents,   # type: ignore
         msg=Msg("user", content, "user"),
     )
 
-    return result.content
+    return result.content # type: ignore
 
 
 class RouteChoice(BaseModel):
@@ -130,7 +130,7 @@ async def run_branching_workflow(user_request: str) -> str:
     else:
         out = await full_review(Msg("user", user_request, "user"))
 
-    return out.content
+    return out.content  # type: ignore
 
 
 async def run_parallel_workflow(content: str) -> str:
@@ -164,7 +164,7 @@ async def run_parallel_workflow(content: str) -> str:
 
     # 并行执行
     msgs = await fanout_pipeline(
-        agents=experts,
+        agents=experts,  # type: ignore
         msg=Msg("user", content, "user"),
         enable_gather=True,
     )
@@ -175,10 +175,10 @@ async def run_parallel_workflow(content: str) -> str:
         sys_prompt="将来自多位专家的审阅意见汇总成一份结构清晰、条理分明的总审阅报告。",
     )
 
-    merged_text = "\n\n".join([m.content for m in msgs])
+    merged_text = "\n\n".join([m.content for m in msgs])  # type: ignore
     summary = await summarizer(Msg("user", merged_text, "user"))
 
-    return summary.content
+    return summary.content  # type: ignore
 
 
 async def run_moa_workflow(task: str) -> str:
@@ -211,7 +211,7 @@ async def run_moa_workflow(task: str) -> str:
 
     # 并行执行所有提议者
     msgs = await fanout_pipeline(
-        agents=proposers,
+        agents=proposers, # type: ignore
         msg=Msg("user", task, "user"),
         enable_gather=True,
     )
@@ -229,7 +229,7 @@ async def run_moa_workflow(task: str) -> str:
     merged = "\n\n".join([f"模型 {i+1} 的回答:\n{m.content}" for i, m in enumerate(msgs)])
     final = await aggregator(Msg("user", merged, "user"))
 
-    return final.content
+    return final.content  # type: ignore    
 
 
 async def ask_human_decision(question: str) -> ToolResponse:
@@ -243,8 +243,8 @@ async def ask_human_decision(question: str) -> ToolResponse:
         Msg("assistant", question, "assistant")
     )
     return ToolResponse(
-        content=[TextBlock(type="text", text=reply.get_text_content())]
-    )
+        content=[TextBlock(type="text", text=reply.get_text_content())] # type: ignore
+    ) 
 
 
 async def run_hitl_workflow(course_content: str) -> str:
@@ -294,4 +294,4 @@ async def run_hitl_workflow(course_content: str) -> str:
     )
 
     final_action = await rewriter(Msg("user", task, "user"))
-    return final_action.content
+    return final_action.content # type: ignore
