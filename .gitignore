@@ -1,1 +1,43 @@
+# Copilot / local tooling
 .deep-copilot/
+.vscode/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+
+# Python cache, test, coverage, and build artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Local logs and runtime output
+*.log
+logs/
+
+# Local vector stores and databases
+data/*.json
+data/memory/
+data/qdrant/
+*.sqlite
+*.sqlite3
+*.db
+
+# Frontend dependencies and build output
+node_modules/
+frontend/dist/
+frontend/build/
+
+skills/

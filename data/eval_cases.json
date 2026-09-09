@@ -3,18 +3,37 @@
     "id": "case_001",
     "question": "帮我搜集 Transformer 模型的教学资料",
     "expected_tools": ["web_search"],
-    "difficulty": "easy"
+    "difficulty": "easy",
+    "category": "basic"
   },
   {
     "id": "case_002",
     "question": "找到 Attention Is All You Need 这篇论文",
-    "expected_tools": ["search_arxiv_paper"],
-    "difficulty": "easy"
+    "expected_tools": ["web_search"],
+    "difficulty": "easy",
+    "category": "basic"
   },
   {
     "id": "case_003",
     "question": "为我准备一份关于大模型原理的课程文档，并审查质量",
-    "expected_tools": ["web_search", "search_arxiv_paper"],
-    "difficulty": "hard"
+    "expected_tools": ["web_search"],
+    "difficulty": "hard",
+    "category": "basic"
+  },
+  {
+    "id": "case_004",
+    "question": "请帮我完成一门新的 Python 入门课程的前期调研",
+    "expected_tools": ["web_search"],
+    "difficulty": "hard",
+    "category": "planning",
+    "planning_keywords": ["create_plan", "finish_subtask", "finish_plan"]
+  },
+  {
+    "id": "case_005",
+    "question": "润色以下课程内容的语言风格，不要修改代码:\n\ndef get_user_data(usr_id: str):\n    return f'Data for {usr_id}'\n\nprint(get_user_data(usr_id='u-123'))",
+    "expected_tools": ["execute_python_code"],
+    "difficulty": "medium",
+    "category": "reflection",
+    "reflection_keywords": ["通过", "不通过", "execute_python_code", "usr_id", "user_id"]
   }
 ]
