@@ -3,6 +3,7 @@
 支持端到端和白盒化评测
 """
 import json
+import asyncio
 from pathlib import Path
 from agentscope.message import Msg
 
@@ -76,6 +77,7 @@ class AgentEvaluator:
         """
         question = case.get("question", "")
         expected_tools = case.get("expected_tools", [])
+        category = case.get("category", "basic")  # basic / planning / reflection / workflow
 
         # 运行 Agent
         toolkit = Toolkit()
@@ -84,7 +86,7 @@ class AgentEvaluator:
         try:
             response = await run_agent_query(question, toolkit=toolkit)
 
-            # 提取文本内容 (response 是 [{"type": "text", "text": "..."}])
+            # 提取文本内容
             if isinstance(response, list):
                 response_text = ""
                 for block in response:
@@ -93,20 +95,35 @@ class AgentEvaluator:
             else:
                 response_text = str(response)
 
-            # 评分逻辑
+            # 评分逻辑 (根据类别调整)
             score = 0
 
-            # 1. 回复长度分: 回复非空且有一定长度
+            # 1. 回复长度分
             if response_text and len(response_text) > 10:
                 score += 1
 
-            # 2. 工具调用分: 是否调用了期望的工具
+            # 2. 工具调用分
             if expected_tools:
                 tools_mentioned = sum(1 for t in expected_tools if t in response_text)
                 score += tools_mentioned / len(expected_tools)
 
+            # 3. 规划与执行专项分 (针对 planning 类别)
+            if category == "planning":
+                planning_keywords = case.get("planning_keywords", ["create_plan", "finish_subtask"])
+                planning_found = sum(1 for kw in planning_keywords if kw in response_text)
+                if planning_found > 0:
+                    score += 1
+
+            # 4. 反思模式专项分 (针对 reflection 类别)
+            if category == "reflection":
+                reflection_keywords = case.get("reflection_keywords", ["通过", "不通过", "execute_python_code"])
+                reflection_found = sum(1 for kw in reflection_keywords if kw in response_text)
+                if reflection_found > 0:
+                    score += 1
+
             return {
                 "case_id": case.get("id", ""),
+                "category": category,
                 "question": question,
                 "score": round(score, 2),
                 "response_preview": response_text[:100] if response_text else "",
@@ -117,6 +134,7 @@ class AgentEvaluator:
         except Exception as e:
             return {
                 "case_id": case.get("id", ""),
+                "category": case.get("category", "basic"),
                 "question": question,
                 "score": 0,
                 "error": str(e),
