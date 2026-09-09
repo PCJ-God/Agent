@@ -43,7 +43,7 @@ def capture_plan_snapshot(notebook, plan):
         })
 
 
-async def run_planning_workflow(user_request: str, toolkit: Toolkit = None, mcp_client=None) -> str:
+async def run_planning_workflow(user_request: str, toolkit: Toolkit , mcp_client=None) -> str:
     """运行自主规划演示。
 
     Args:

@@ -21,7 +21,7 @@ from src.config import (
 )
 
 
-async def register_mcp_tools(toolkit: Toolkit, transport: str = None) -> StdIOStatefulClient | HttpStatelessClient:
+async def register_mcp_tools(toolkit: Toolkit, transport: str = "") -> StdIOStatefulClient | HttpStatelessClient:
     """注册 MCP 工具到 Toolkit。
 
     Args:
@@ -58,7 +58,7 @@ async def register_mcp_tools(toolkit: Toolkit, transport: str = None) -> StdIOSt
     return client
 
 
-def register_skill_tools(toolkit: Toolkit, skills_dir: str = None) -> list:
+def register_skill_tools(toolkit: Toolkit, skills_dir: str = "") -> list:
     """注册 Skill 定义的工具。
 
     AgentScope 的 register_agent_skill 会从 SKILL.md 的 frontmatter

@@ -16,7 +16,7 @@ class SkillManager:
     管理本地 Skill 和社区 Skill 的搜索、安装、更新。
     """
 
-    def __init__(self, skills_dir: str = None):
+    def __init__(self, skills_dir: str = ""):
         """初始化 Skill 管理器。
 
         Args:
@@ -117,7 +117,7 @@ class SkillManager:
             print("搜索超时")
             return []
 
-    def install_skill(self, repo: str, skill_name: str = None) -> str:
+    def install_skill(self, repo: str, skill_name: str = "") -> str:
         """安装社区 Skill。
 
         使用 npx skills add 命令安装社区 Skill 到本地。
