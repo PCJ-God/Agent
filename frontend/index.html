@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent 智能体系统</title>
+<title>Agent 智能体系统 — Hierarchical</title>
+<!-- 数学公式样式 (KaTeX)，渲染脚本在页面底部引入 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <style>
   :root {
     --bg: #0c0c14;
@@ -14,16 +16,13 @@
     --text: #e0e0e8;
     --text-muted: #7a7a90;
     --accent: #4a9eff;
-    --accent-dim: rgba(74, 158, 255, 0.1);
     --green: #34d399;
     --red: #f87171;
     --amber: #f59e0b;
     --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
     --sans: 'Inter', -apple-system, sans-serif;
   }
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body {
     font-family: var(--sans);
     background: var(--bg);
@@ -33,7 +32,6 @@
     overflow: hidden;
   }
 
-  /* ── Sidebar ── */
   .sidebar {
     width: 260px;
     background: var(--surface);
@@ -42,19 +40,16 @@
     flex-direction: column;
     flex-shrink: 0;
   }
-
   .sidebar-header {
     padding: 20px;
     border-bottom: 1px solid var(--border);
   }
-
   .sidebar-header h2 {
     font-family: var(--mono);
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 4px;
   }
-
   .sidebar-header .status {
     font-size: 11px;
     color: var(--green);
@@ -62,7 +57,6 @@
     align-items: center;
     gap: 6px;
   }
-
   .sidebar-header .status::before {
     content: '';
     width: 6px;
@@ -70,42 +64,23 @@
     border-radius: 50%;
     background: var(--green);
   }
-
-  .workflow-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
+  .arch-info {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
   }
-
-  .workflow-item {
-    padding: 12px;
-    border-radius: 6px;
-    cursor: pointer;
+  .arch-layer {
+    padding: 8px 12px;
     margin-bottom: 4px;
-    border: 1px solid transparent;
-    transition: all 0.15s;
-  }
-
-  .workflow-item:hover { background: var(--surface-hover); }
-  .workflow-item.active {
-    border-color: var(--border-active);
-    background: var(--accent-dim);
-  }
-
-  .workflow-item h3 {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-
-  .workflow-item p {
+    border-radius: 4px;
     font-size: 11px;
-    color: var(--text-muted);
-    line-height: 1.4;
+    font-family: var(--mono);
+    border-left: 3px solid var(--border-active);
+    background: rgba(74,158,255,0.05);
   }
-
+  .arch-layer .label { color: var(--accent); }
+  .arch-layer .desc { color: var(--text-muted); }
   .sidebar-footer {
+    margin-top: auto;
     padding: 12px;
     border-top: 1px solid var(--border);
     font-size: 11px;
@@ -113,15 +88,12 @@
     text-align: center;
   }
 
-  /* ── Main ── */
   .main {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
   }
-
-  /* ── Top bar ── */
   .topbar {
     padding: 12px 20px;
     border-bottom: 1px solid var(--border);
@@ -129,21 +101,16 @@
     align-items: center;
     justify-content: space-between;
   }
-
   .topbar .current-wf {
     font-family: var(--mono);
     font-size: 13px;
     font-weight: 600;
   }
-
   .topbar .mcp-status {
     font-size: 11px;
     color: var(--text-muted);
     font-family: var(--mono);
   }
-
-  .topbar-actions { display: flex; gap: 8px; }
-
   .icon-btn {
     background: none;
     border: 1px solid var(--border);
@@ -155,17 +122,13 @@
     font-family: var(--mono);
     transition: all 0.15s;
   }
-
   .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .icon-btn.stop:hover { border-color: var(--red); color: var(--red); }
 
-  /* ── Chat area ── */
   .chat-area {
     flex: 1;
     overflow-y: auto;
     padding: 24px;
   }
-
   .welcome {
     display: flex;
     flex-direction: column;
@@ -175,7 +138,6 @@
     text-align: center;
     color: var(--text-muted);
   }
-
   .welcome h1 {
     font-family: var(--mono);
     font-size: 20px;
@@ -183,11 +145,9 @@
     color: var(--text);
     margin-bottom: 8px;
   }
-
-  .welcome p { font-size: 13px; max-width: 400px; }
+  .welcome p { font-size: 13px; max-width: 420px; line-height: 1.6; }
 
   .msg { margin-bottom: 20px; max-width: 720px; margin-left: auto; margin-right: auto; }
-
   .msg-role {
     font-family: var(--mono);
     font-size: 11px;
@@ -196,45 +156,85 @@
     align-items: center;
     gap: 6px;
   }
-
   .msg-role.user { color: var(--amber); }
   .msg-role.agent { color: var(--accent); }
-
-  .msg-role .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-  }
-
-  .msg-role.user .dot { background: var(--amber); }
-  .msg-role.agent .dot { background: var(--accent); }
-
+  .msg-role.user .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+  .msg-role.agent .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
   .msg-body {
     font-size: 14px;
     line-height: 1.7;
     white-space: pre-wrap;
     word-break: break-word;
   }
+  .msg-body.thinking { color: var(--text-muted); font-style: italic; font-size: 12px; }
 
-  .msg-body.thinking {
-    color: var(--text-muted);
-    font-style: italic;
-    font-size: 12px;
+  /* Agent 输出经 marked 渲染后的排版 */
+  .msg-body.rich { white-space: normal; }
+  .msg-body.rich > :first-child { margin-top: 0; }
+  .msg-body.rich > :last-child { margin-bottom: 0; }
+  .msg-body.rich h1, .msg-body.rich h2, .msg-body.rich h3,
+  .msg-body.rich h4, .msg-body.rich h5, .msg-body.rich h6 {
+    margin: 18px 0 8px;
+    line-height: 1.4;
+    font-weight: 600;
+    color: #fff;
   }
+  .msg-body.rich h1 { font-size: 19px; }
+  .msg-body.rich h2 { font-size: 17px; }
+  .msg-body.rich h3 { font-size: 15.5px; }
+  .msg-body.rich h4 { font-size: 14.5px; }
+  .msg-body.rich h5, .msg-body.rich h6 { font-size: 14px; }
+  .msg-body.rich p { margin: 8px 0; }
+  .msg-body.rich ul, .msg-body.rich ol { margin: 8px 0; padding-left: 26px; }
+  .msg-body.rich li { margin: 4px 0; }
+  .msg-body.rich li > ul, .msg-body.rich li > ol { margin: 4px 0; }
+  .msg-body.rich strong { color: #fff; font-weight: 600; }
+  .msg-body.rich a { color: var(--accent); }
+  .msg-body.rich code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  .msg-body.rich pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    overflow-x: auto;
+    margin: 10px 0;
+  }
+  .msg-body.rich pre code { background: none; border: none; padding: 0; }
+  .msg-body.rich blockquote {
+    border-left: 3px solid var(--border-active);
+    padding-left: 12px;
+    margin: 8px 0;
+    color: var(--text-muted);
+  }
+  .msg-body.rich table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  .msg-body.rich th, .msg-body.rich td {
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    text-align: left;
+  }
+  .msg-body.rich th { background: var(--surface-hover); font-weight: 600; }
+  .msg-body.rich hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  /* 块级公式可能很宽，允许横向滚动而不是把气泡撑破 */
+  .msg-body.rich .katex-display { margin: 10px 0; overflow-x: auto; overflow-y: hidden; }
+  .msg-body.rich .katex { font-size: 1.02em; }
 
-  /* ── Input area ── */
   .input-area {
     padding: 16px 24px;
     border-top: 1px solid var(--border);
   }
-
   .input-box {
     max-width: 720px;
     margin: 0 auto;
     display: flex;
     gap: 8px;
   }
-
   .input-box textarea {
     flex: 1;
     background: var(--surface);
@@ -250,9 +250,7 @@
     max-height: 120px;
     transition: border-color 0.15s;
   }
-
   .input-box textarea:focus { border-color: var(--accent); }
-
   .send-btn {
     padding: 0 20px;
     background: var(--accent);
@@ -265,10 +263,8 @@
     font-weight: 600;
     transition: background 0.15s;
   }
-
   .send-btn:hover { background: #3a8eef; }
   .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
   .input-hint {
     max-width: 720px;
     margin: 8px auto 0;
@@ -276,70 +272,35 @@
     color: var(--text-muted);
     font-family: var(--mono);
   }
-
-  /* ── Responsive ── */
-  @media (max-width: 768px) {
-    .sidebar { display: none; }
-  }
+  @media (max-width: 768px) { .sidebar { display: none; } }
 </style>
 </head>
 <body>
 
-<!-- Sidebar -->
 <aside class="sidebar">
   <div class="sidebar-header">
     <h2>Agent 系统</h2>
-    <div class="status">已连接</div>
+    <div class="status">Hierarchical 层级协作</div>
   </div>
-  <div class="workflow-list">
-    <div class="workflow-item active" data-wf="react">
-      <h3>ReAct Agent</h3>
-      <p>简单问答，思考-行动-观察循环</p>
-    </div>
-    <div class="workflow-item" data-wf="planning">
-      <h3>Planning Notebook</h3>
-      <p>复杂任务自主规划执行</p>
-    </div>
-    <div class="workflow-item" data-wf="parallel">
-      <h3>Parallel Review</h3>
-      <p>4 专家并行评估</p>
-    </div>
-    <div class="workflow-item" data-wf="hierarchical">
-      <h3>Hierarchical</h3>
-      <p>Leader-Worker 层级分工</p>
-    </div>
-    <div class="workflow-item" data-wf="cocreation">
-      <h3>Co-creation</h3>
-      <p>MsgHub 圆桌共创</p>
-    </div>
-    <div class="workflow-item" data-wf="moa">
-      <h3>MoA</h3>
-      <p>多模型混合追求质量</p>
-    </div>
-    <div class="workflow-item" data-wf="feedback">
-      <h3>External Feedback</h3>
-      <p>代码自动验证</p>
-    </div>
+  <div class="arch-info">
+    <div class="arch-layer"><span class="label">接入层</span> <span class="desc">CLI / FastAPI</span></div>
+    <div class="arch-layer"><span class="label">调度层</span> <span class="desc">Leader 任务分配</span></div>
+    <div class="arch-layer"><span class="label">执行层</span> <span class="desc">Researcher + Reviewer</span></div>
+    <div class="arch-layer"><span class="label">存储层</span> <span class="desc">Memory + Output</span></div>
   </div>
-  <div class="sidebar-footer">
-    MCP: stdio (本地) · Skill: course-review
-  </div>
+  <div class="sidebar-footer" id="mcpFooter">MCP: 连接中...</div>
 </aside>
 
-<!-- Main -->
 <main class="main">
   <div class="topbar">
-    <span class="current-wf" id="currentWf">ReAct Agent</span>
-    <div class="topbar-actions">
-      <button class="icon-btn stop" id="stopBtn">⏹ 叫停</button>
-      <button class="icon-btn" id="clearBtn">清空</button>
-    </div>
+    <span class="current-wf">Hierarchical 层级协作</span>
+    <button class="icon-btn" id="clearBtn">清空</button>
   </div>
 
   <div class="chat-area" id="chatArea">
     <div class="welcome">
       <h1>Agent 智能体系统</h1>
-      <p>选择左侧工作流，输入问题开始交互。所有工作流共享同一套工具和记忆。</p>
+      <p>四层架构: 接入层 → 调度层(Leader) → 执行层(Researcher + Reviewer + MCP/Skills) → 存储层(Memory)</p>
     </div>
   </div>
 
@@ -348,144 +309,256 @@
       <textarea id="userInput" placeholder="输入你的问题..." rows="1"></textarea>
       <button class="send-btn" id="sendBtn">发送</button>
     </div>
-    <div class="input-hint">Enter 发送 · Shift+Enter 换行 · 左侧切换工作流</div>
+    <div class="input-hint">Enter 发送 · Shift+Enter 换行</div>
   </div>
 </main>
 
-<script>
-  // State
-  let currentWf = 'react';
-  let isRunning = false;
-  let messages = [];
+<!-- 渲染依赖 (jsdelivr): Markdown / XSS 消毒 / LaTeX 公式 -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 
-  // Elements
+<script>
+  let isRunning = false;
+
   const chatArea = document.getElementById('chatArea');
   const userInput = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
-  const stopBtn = document.getElementById('stopBtn');
   const clearBtn = document.getElementById('clearBtn');
-  const currentWfEl = document.getElementById('currentWf');
+  const mcpFooter = document.getElementById('mcpFooter');
 
-  // Workflow selection
-  document.querySelectorAll('.workflow-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.workflow-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-      currentWf = item.dataset.wf;
-      currentWfEl.textContent = item.querySelector('h3').textContent;
-    });
-  });
+  // 获取 MCP 状态
+  fetch('/health').then(r => r.json()).then(d => {
+    mcpFooter.textContent = 'MCP: ' + (d.mcp || '未知');
+  }).catch(() => {});
 
-  // Auto-resize textarea
   userInput.addEventListener('input', () => {
     userInput.style.height = 'auto';
     userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
   });
 
-  // Send message
+  // 建立消息气泡，返回 { msg, body }。
+  // 一律用 textContent 写入，避免模型输出里的 HTML 被当作标记执行 (XSS)。
+  function createMessage(label, { role = 'agent', thinking = false } = {}) {
+    const msg = document.createElement('div');
+    msg.className = 'msg';
+    const roleEl = document.createElement('div');
+    roleEl.className = 'msg-role ' + role;
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    roleEl.append(dot, document.createTextNode(label));
+    const body = document.createElement('div');
+    body.className = 'msg-body' + (thinking ? ' thinking' : '');
+    msg.append(roleEl, body);
+    chatArea.appendChild(msg);
+    chatArea.scrollTop = chatArea.scrollHeight;
+    return { msg, body };
+  }
+
+  function addMessage(role, content, isThinking = false) {
+    const { msg, body } = createMessage(role === 'user' ? 'user' : 'Agent', {
+      role, thinking: isThinking
+    });
+    body.textContent = content;
+    return msg;
+  }
+
+  const BS = String.fromCharCode(92);   // 反斜杠
+  // 数学定界符: [开始, 结束, 是否块级]。用 BS 拼接而不是写反斜杠字面量，
+  // 避免源码里出现成片的 "\\[" "\\(" 转义。
+  const MATH_DELIMS = [
+    ['$$', '$$', true],
+    [BS + '[', BS + ']', true],
+    [BS + '(', BS + ')', true],
+    ['$', '$', false],
+  ];
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // 把数学片段摘出来换成占位符。
+  // 必须先摘: marked 会把 \{ \} \dots 当作 Markdown 转义吃掉，
+  // 公式里的花括号就画不出来了。
+  function protectMath(text) {
+    const spans = [];
+    let out = '';
+    let i = 0;
+    outer:
+    while (i < text.length) {
+      for (const d of MATH_DELIMS) {
+        if (!text.startsWith(d[0], i)) continue;
+        const end = text.indexOf(d[1], i + d[0].length);
+        // 行内公式限制长度，避免一个孤立的 $ 把大段正文吞进公式
+        if (end === -1 || (!d[2] && end - i > 200)) continue;
+        spans.push(text.slice(i, end + d[1].length));
+        out += '@@MATH' + (spans.length - 1) + '@@';
+        i = end + d[1].length;
+        continue outer;
+      }
+      out += text[i];
+      i += 1;
+    }
+    return { text: out, spans };
+  }
+
+  // Agent 输出是 Markdown + LaTeX。渲染管线:
+  //   1. 摘出数学片段 → 2. marked 渲染 Markdown → 3. DOMPurify 消毒
+  //   → 4. 还原公式 → 5. KaTeX 排版
+  // 第 3 步不能省: marked 会原样保留内联 HTML，直接 innerHTML 就是 XSS。
+  function renderRich(el, raw) {
+    if (typeof marked === 'undefined') {
+      el.textContent = raw;   // CDN 没加载成功时退化为纯文本
+      return;
+    }
+    const { text, spans } = protectMath(raw);
+
+    let html = marked.parse(text, { gfm: true, breaks: true });
+    if (typeof DOMPurify !== 'undefined') html = DOMPurify.sanitize(html);
+
+    // 用 split 还原占位符（不用正则，省掉转义）
+    const parts = html.split('@@MATH');
+    if (parts.length > 1) {
+      let restored = parts[0];
+      for (let k = 1; k < parts.length; k++) {
+        const close = parts[k].indexOf('@@');
+        if (close === -1) {
+          restored += '@@MATH' + parts[k];
+        } else {
+          const idx = parseInt(parts[k].slice(0, close), 10);
+          restored += escapeHtml(spans[idx]) + parts[k].slice(close + 2);
+        }
+      }
+      html = restored;
+    }
+    el.innerHTML = html;
+
+    if (typeof renderMathInElement === 'function') {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: BS + '[', right: BS + ']', display: true },
+          { left: BS + '(', right: BS + ')', display: false },
+          { left: '$', right: '$', display: false },
+        ],
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
+        throwOnError: false,
+      });
+    }
+  }
+
   async function sendMessage() {
     const text = userInput.value.trim();
     if (!text || isRunning) return;
 
-    // Clear welcome
     const welcome = chatArea.querySelector('.welcome');
     if (welcome) welcome.remove();
 
-    // Add user message
     addMessage('user', text);
-    messages.push({ role: 'user', content: text });
     userInput.value = '';
     userInput.style.height = 'auto';
 
-    // Send to backend
     isRunning = true;
     sendBtn.disabled = true;
-    stopBtn.style.opacity = '1';
 
-    // Show thinking
     const thinkingEl = addMessage('agent', '思考中...', true);
+    const bubbles = new Map();   // 后端 msg.id -> 气泡
+
+    function renderNow(b) {
+      if (b.timer) { clearTimeout(b.timer); b.timer = null; }
+      renderRich(b.body, b.text);
+      b.body.classList.add('rich');
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    // 流式期间约每 120ms 才重排一次；每个字符都跑一遍 marked+KaTeX 会卡
+    function renderSoon(b) {
+      if (b.timer) return;
+      b.timer = setTimeout(() => { b.timer = null; renderNow(b); }, 120);
+    }
+
+    function handleEvent(ev) {
+      if (ev.type === 'chunk') {
+        if (thinkingEl.parentNode) thinkingEl.remove();
+        let b = bubbles.get(ev.id);
+        if (!b) {
+          b = createMessage(ev.name || 'Agent');
+          b.text = '';
+          b.timer = null;
+          bubbles.set(ev.id, b);
+        }
+        b.text += ev.text;
+        // last=true 表示该条消息的最后一个分片，立刻出终版
+        if (ev.last) renderNow(b); else renderSoon(b);
+      } else if (ev.type === 'done') {
+        if (thinkingEl.parentNode) thinkingEl.remove();
+        bubbles.forEach(renderNow);
+        // 兜底：万一一个分片都没收到，就把最终答案直接渲染出来
+        if (bubbles.size === 0 && ev.response) {
+          const m = createMessage('Agent');
+          renderRich(m.body, ev.response);
+          m.body.classList.add('rich');
+        }
+      } else if (ev.type === 'error') {
+        if (thinkingEl.parentNode) thinkingEl.remove();
+        addMessage('agent', '❌ ' + ev.error);
+      }
+    }
 
     try {
-      const payload = { message: text, workflow: currentWf };
-      console.log('Sending:', payload);
-
-      const res = await fetch('/api/chat', {
+      const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ message: text })
       });
+      if (!res.ok || !res.body) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail.detail || ('HTTP ' + res.status));
+      }
 
-      console.log('Response status:', res.status);
-      const data = await res.json();
-      console.log('Response data:', data);
+      // 逐块读取 SSE 流：后端每产出一段文本就立刻渲染到对应气泡
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
 
-      // Remove thinking, add real response
-      thinkingEl.remove();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
 
-      if (data.success) {
-        addMessage('agent', data.response);
-        messages.push({ role: 'agent', content: data.response });
-      } else {
-        console.error('Agent error:', data.error);
-        addMessage('agent', '❌ ' + (data.error || '请求失败'));
+        let sep;
+        while ((sep = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          const line = frame.split('\n').find(l => l.startsWith('data:'));
+          if (!line) continue;
+          try {
+            handleEvent(JSON.parse(line.slice(5).trim()));
+          } catch (e) { /* 忽略坏帧 */ }
+        }
       }
     } catch (err) {
-      thinkingEl.remove();
-      addMessage('agent', '❌ 网络错误: ' + err.message);
+      if (thinkingEl.parentNode) thinkingEl.remove();
+      addMessage('agent', '❌ ' + err.message);
     } finally {
+      if (thinkingEl.parentNode) thinkingEl.remove();
       isRunning = false;
       sendBtn.disabled = false;
-      stopBtn.style.opacity = '0.4';
     }
   }
 
-  function addMessage(role, content, isThinking = false) {
-    const msg = document.createElement('div');
-    msg.className = 'msg';
-    msg.innerHTML = `
-      <div class="msg-role ${role}">
-        <span class="dot"></span>
-        ${role === 'user' ? 'user' : 'Agent'}
-      </div>
-      <div class="msg-body${isThinking ? ' thinking' : ''}">${content}</div>
-    `;
-    chatArea.appendChild(msg);
-    chatArea.scrollTop = chatArea.scrollHeight;
-    return msg;
-  }
-
-  // Event listeners
   sendBtn.addEventListener('click', sendMessage);
   userInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
-
   clearBtn.addEventListener('click', () => {
     chatArea.innerHTML = `
       <div class="welcome">
         <h1>Agent 智能体系统</h1>
-        <p>选择左侧工作流，输入问题开始交互。所有工作流共享同一套工具和记忆。</p>
-      </div>
-    `;
-    messages = [];
-  });
-
-  stopBtn.addEventListener('click', () => {
-    if (isRunning) {
-      // TODO: 调用后端取消接口
-      isRunning = false;
-      sendBtn.disabled = false;
-      stopBtn.style.opacity = '0.4';
-      const thinking = chatArea.querySelector('.thinking');
-      if (thinking) {
-        thinking.textContent = '⏹ 已叫停';
-      }
-    }
+        <p>四层架构: 接入层 → 调度层(Leader) → 执行层(Researcher + Reviewer + MCP/Skills) → 存储层(Memory)</p>
+      </div>`;
   });
 </script>
-
 </body>
 </html>
