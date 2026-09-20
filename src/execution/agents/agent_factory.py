@@ -3,19 +3,21 @@ Agent 工厂模块
 统一管理不同类型 Agent 的创建
 """
 from agentscope.agent import ReActAgent
+from agentscope.memory import LongTermMemoryBase
 from agentscope.tool import Toolkit
-from agentscope.model import DashScopeChatModel
-from agentscope.formatter import DashScopeChatFormatter
 
-from src.config import DASHSCOPE_API_KEY, LLM_MODEL
-from src.agent_engine.react_agent import create_react_agent
+from src.execution.agents.react_agent import create_react_agent
 
 
-def create_research_agent(toolkit: Toolkit = None) -> ReActAgent:
+def create_research_agent(
+    toolkit: Toolkit | None = None,
+    long_term_memory: LongTermMemoryBase | None = None,
+) -> ReActAgent:
     """创建研究助手 Agent。
 
     Args:
-        toolkit: 工具箱
+        toolkit: 工具箱（由调用方提供，内含 MCP 工具与 Skill）
+        long_term_memory: 长期记忆实例
 
     Returns:
         研究助手 Agent
@@ -27,14 +29,19 @@ def create_research_agent(toolkit: Toolkit = None) -> ReActAgent:
             "请使用工具搜集相关资料，并整理为结构化的内容。"
         ),
         toolkit=toolkit,
+        long_term_memory=long_term_memory,
     )
 
 
-def create_review_agent(toolkit: Toolkit = None) -> ReActAgent:
+def create_review_agent(
+    toolkit: Toolkit | None = None,
+    long_term_memory: LongTermMemoryBase | None = None,
+) -> ReActAgent:
     """创建质量审查 Agent。
 
     Args:
-        toolkit: 工具箱
+        toolkit: 工具箱（由调用方提供，内含 MCP 工具与 Skill）
+        long_term_memory: 长期记忆实例
 
     Returns:
         质量审查 Agent
@@ -47,23 +54,5 @@ def create_review_agent(toolkit: Toolkit = None) -> ReActAgent:
             "请给出每个维度的评分 (1-5分) 和具体的改进建议。"
         ),
         toolkit=toolkit,
-    )
-
-
-def create_planning_agent(toolkit: Toolkit = None) -> ReActAgent:
-    """创建规划 Agent。
-
-    Args:
-        toolkit: 工具箱
-
-    Returns:
-        规划 Agent
-    """
-    return create_react_agent(
-        name="Planning Agent",
-        sys_prompt=(
-            "你是一个善于规划和执行复杂任务的助理。\n"
-            "收到任务后，先生成详细的执行计划，然后逐步完成每个子任务。"
-        ),
-        toolkit=toolkit,
+        long_term_memory=long_term_memory,
     )
