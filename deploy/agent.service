@@ -1,0 +1,55 @@
+# systemd 服务单元 —— 放到 /etc/systemd/system/agent.service
+#
+# 安装：
+#   sudo cp deploy/agent.service /etc/systemd/system/agent.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now agent
+#
+# 查看：
+#   systemctl status agent
+#   journalctl -u agent -f
+#
+# 下面三处要按你的实际路径/用户改：User/Group、WorkingDirectory/ExecStart。
+
+[Unit]
+Description=Agent 智能教学助手（FastAPI + 层级协作）
+Documentation=file:///opt/agent/docs/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agent
+Group=agent
+
+# 关键：src/config.py 用的是 load_dotenv()（不带路径，按当前工作目录找 .env）。
+# 这个目录写错就找不到 .env，check_api_key() 会在启动时直接失败。
+WorkingDirectory=/opt/agent
+
+# 用虚拟环境里的解释器，不要依赖 shell 里激活的是哪个环境
+ExecStart=/opt/agent/.venv/bin/python scripts/run_server.py
+
+# 崩了自动拉起
+Restart=always
+RestartSec=5
+# 连续快速失败就放弃，避免无限重启刷爆日志
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agent
+
+# 一轮对话可能跑好几分钟：停止服务时别硬杀，给它收尾的机会
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# 只需要写 data/，不需要任何特权
+NoNewPrivileges=true
+
+# 可选：内存不够时让 systemd 只杀这个服务，而不是让整机 OOM。
+# 2 GB 的机器可以按需打开（给系统和 nginx 留出余量）。
+# MemoryMax=1400M
+
+[Install]
+WantedBy=multi-user.target

@@ -7,23 +7,71 @@
 """
 import asyncio
 import json
+import logging
+import time
+import uuid
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from src.config import check_api_key, setup_logging
+from src.access.auth import current_user
+from src.config import (
+    FORWARDED_ALLOW_IPS,
+    HOST,
+    MAX_SESSIONS_PER_USER,
+    MAX_TEAMS,
+    PORT,
+    RATE_LIMIT_PER_MINUTE,
+    SSL_CERTFILE,
+    SSL_KEYFILE,
+    check_api_key,
+    setup_logging,
+)
 from src.orchestration.hierarchical import HierarchicalTeam
+from src.storage.memory.session_store import (
+    count_sessions,
+    create_user,
+    delete_session,
+    ensure_session,
+    list_sessions,
+    page_messages,
+    session_exists,
+)
+
+logger = logging.getLogger(__name__)
 
 
 # ── 数据模型 ──
+DEFAULT_SESSION = "default"
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(default="", description="可选的名字，便于识别")
+
+
+class UserInfo(BaseModel):
+    user_id: str = Field(description="用户 ID（长期记忆按它隔离）")
+    name: str = ""
+    created_at: str = ""
+
+
+class RegisterResponse(UserInfo):
+    token: str = Field(description="凭证。之后用 Authorization: Bearer <token> 访问")
+
+
 class ChatRequest(BaseModel):
     message: str = Field(description="用户问题")
+    session_id: str = Field(
+        default=DEFAULT_SESSION,
+        description="任务 ID。同一用户下不同任务的记忆互相隔离；跨用户天然隔离",
+    )
 
 
 class AgentResponse(BaseModel):
@@ -36,36 +84,99 @@ class AgentResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     mcp: str = "disconnected"
+    sessions: int = 0
 
 
-# ── FastAPI 应用 ──
-_hierarchical_team: HierarchicalTeam | None = None
+# ── 会话（任务）管理 ──
+# 缓存键是 (user_id, session_id)：同一个 session_id 在不同用户下是两个
+# 互不相干的团队。锁也按这个键分 —— 不同用户、不同任务都能并行推进。
+_teams: "OrderedDict[tuple[str, str], HierarchicalTeam]" = OrderedDict()
+_locks: dict[tuple[str, str], asyncio.Lock] = {}
+_registry_lock = asyncio.Lock()      # 只保护上面两个容器，不参与对话本身
+_rate: dict[str, list[float]] = {}   # user_id -> 最近一分钟的请求时间戳
 
 
-async def get_team() -> HierarchicalTeam:
-    """获取（惰性装配的）团队单例。
+def session_lock(key: tuple[str, str]) -> asyncio.Lock:
+    """取该任务自己的锁。不同任务互不阻塞。"""
+    lock = _locks.get(key)
+    if lock is None:
+        lock = _locks[key] = asyncio.Lock()
+    return lock
 
-    整个进程共用一个，因此三个 Agent 的短期记忆、长期记忆池、MCP 连接
-    都是跨请求保留的。
+
+def _evict_locked(exclude: tuple[str, str]) -> None:
+    """超出 MAX_TEAMS 时按 LRU 淘汰空闲团队。
+
+    正在对话的（锁被持有）不踢。历史都在 SQLite 里，被淘汰的任务下次访问
+    会重新装配并回放上下文。
     """
-    global _hierarchical_team
-    if _hierarchical_team is None:
-        _hierarchical_team = await HierarchicalTeam.create()
-    return _hierarchical_team
+    while len(_teams) > MAX_TEAMS:
+        for key in list(_teams.keys()):          # OrderedDict：最久未用的在前
+            if key != exclude and not session_lock(key).locked():
+                _teams.pop(key, None)
+                break
+        else:
+            return      # 全都在忙，暂时超限
+
+
+async def get_team(user_id: str, session_id: str) -> HierarchicalTeam:
+    """按 (用户, 任务) 获取（惰性装配的）团队。"""
+    key = (user_id, session_id)
+    async with _registry_lock:
+        team = _teams.get(key)
+        if team is not None:
+            _teams.move_to_end(key)
+            return team
+        # 新任务先查配额；已存在的任务不受影响
+        if not await asyncio.to_thread(session_exists, user_id, session_id):
+            used = await asyncio.to_thread(count_sessions, user_id)
+            if used >= MAX_SESSIONS_PER_USER:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"任务数已达上限 {MAX_SESSIONS_PER_USER}，请先删除不再需要的任务",
+                )
+
+    # 装配很慢（连 MCP、抓工具、建三个 Agent），放到锁外做 ——
+    # 不能让一个用户的首次请求把所有用户都堵住。
+    team = await HierarchicalTeam.create(session_id=session_id, user_id=user_id)
+    async with _registry_lock:
+        existing = _teams.setdefault(key, team)
+        _teams.move_to_end(key)
+        _evict_locked(key)
+        return existing
+
+
+def check_rate_limit(user_id: str) -> None:
+    """每用户每分钟最多 RATE_LIMIT_PER_MINUTE 次对话请求（<=0 表示关闭）。"""
+    if RATE_LIMIT_PER_MINUTE <= 0:
+        return
+    now = time.monotonic()
+    hits = [t for t in _rate.get(user_id, []) if now - t < 60.0]
+    if len(hits) >= RATE_LIMIT_PER_MINUTE:
+        raise HTTPException(
+            status_code=429,
+            detail=f"请求过于频繁（每分钟最多 {RATE_LIMIT_PER_MINUTE} 次），请稍后再试",
+        )
+    hits.append(now)
+    _rate[user_id] = hits
 
 
 def mcp_status() -> str:
     """MCP 连接状态（供 /health 展示）。"""
-    if _hierarchical_team is None:
+    if not _teams:
         return "initializing"
-    return "connected" if _hierarchical_team.mcp_client is not None else "unavailable"
+    team = next(iter(_teams.values()))
+    return "connected" if team.mcp_client is not None else "unavailable"
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """启动时一次性完成装配：MCP 客户端 + 向量库 + 三个 Agent。"""
+    """启动时只校验配置。
+
+    多用户场景下没有「默认会话」这回事（团队按 (用户, 任务) 装配），而且每个
+    团队自带 MCP 客户端，预热一个并不能加速别人的首次请求 —— 所以改为按需装配。
+    """
     check_api_key()
-    await get_team()
     yield
 
 
@@ -74,24 +185,124 @@ app = FastAPI(title="Agent API — Hierarchical Mode", lifespan=lifespan)
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    return HealthResponse(status="ok", mcp=mcp_status())
+    """健康检查（公开，不含任何用户数据）。"""
+    return HealthResponse(status="ok", mcp=mcp_status(), sessions=len(_teams))
+
+
+# ── 认证 ──
+@app.post("/api/auth/register", response_model=RegisterResponse)
+async def api_register(req: RegisterRequest):
+    """注册：发放一个 uuid4 token。
+
+    客户端保存 token，之后所有请求带 `Authorization: Bearer <token>`。
+    """
+    return await asyncio.to_thread(create_user, req.name)
+
+
+@app.get("/api/auth/me", response_model=UserInfo)
+async def api_me(user: dict = Depends(current_user)):
+    """校验 token 并返回当前用户。"""
+    return user
 
 
 @app.post("/api/chat", response_model=AgentResponse)
-async def chat(req: ChatRequest):
+async def chat(req: ChatRequest, user: dict = Depends(current_user)):
     if not req.message:
         return AgentResponse(success=False, response="", error="消息不能为空")
 
     try:
-        team = await get_team()
-        result = await team.chat(req.message)
+        check_rate_limit(user["user_id"])
+        key = (user["user_id"], req.session_id)
+        team = await get_team(*key)
+        # 任务内串行：Leader 的 InMemoryMemory 不是并发安全的
+        async with session_lock(key):
+            result = await team.chat(req.message)
         return AgentResponse(success=True, response=result)
+    except HTTPException as e:
+        return AgentResponse(success=False, response="", error=e.detail)
     except Exception as e:
         return AgentResponse(success=False, response="", error=str(e))
 
 
+# ── 会话（任务）与历史 ──
+class SessionInfo(BaseModel):
+    session_id: str = Field(description="任务 ID")
+    title: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    messages: int = Field(default=0, description="该任务已有的消息条数")
+
+
+class CreateSessionRequest(BaseModel):
+    session_id: str = Field(default="", description="任务 ID；留空则自动生成")
+    title: str = Field(default="", description="任务名称")
+
+
+class MessageItem(BaseModel):
+    id: int = Field(description="消息 ID，同时用作分页游标")
+    role: str
+    name: str = ""
+    content: str
+    created_at: str = ""
+
+
+class MessagePage(BaseModel):
+    session_id: str
+    messages: list[MessageItem] = Field(description="按时间正序，可直接渲染")
+    next_cursor: Optional[int] = Field(
+        default=None,
+        description="取更早一页时传给 before=；null 表示已经到头",
+    )
+    total: int = 0
+
+
+@app.get("/api/sessions", response_model=list[SessionInfo])
+async def api_list_sessions(user: dict = Depends(current_user)):
+    """列出当前用户的所有任务（最近活跃的在前）。"""
+    return await asyncio.to_thread(list_sessions, user["user_id"])
+
+
+@app.post("/api/sessions", response_model=SessionInfo)
+async def api_create_session(
+    req: CreateSessionRequest, user: dict = Depends(current_user)
+):
+    """新建一个任务。"""
+    user_id = user["user_id"]
+    if await asyncio.to_thread(count_sessions, user_id) >= MAX_SESSIONS_PER_USER:
+        raise HTTPException(
+            status_code=429,
+            detail=f"任务数已达上限 {MAX_SESSIONS_PER_USER}，请先删除不再需要的任务",
+        )
+    session_id = req.session_id.strip() or f"task-{uuid.uuid4().hex[:8]}"
+    return await asyncio.to_thread(ensure_session, user_id, session_id, req.title)
+
+
+@app.delete("/api/sessions/{session_id}")
+async def api_delete_session(session_id: str, user: dict = Depends(current_user)):
+    """删除任务及其历史。"""
+    key = (user["user_id"], session_id)
+    await asyncio.to_thread(delete_session, *key)
+    async with _registry_lock:
+        _teams.pop(key, None)
+        _locks.pop(key, None)
+    return {"ok": True}
+
+
+@app.get("/api/sessions/{session_id}/messages", response_model=MessagePage)
+async def api_session_messages(
+    session_id: str,
+    user: dict = Depends(current_user),
+    limit: int = 20,
+    before: Optional[int] = None,
+):
+    """分页读取某个任务的对话历史（从最新往旧翻）。"""
+    page = await asyncio.to_thread(
+        page_messages, user["user_id"], session_id, limit, before
+    )
+    return MessagePage(session_id=session_id, **page)
+
+
 # ── 流式对话 (SSE) ──
-_chat_lock = asyncio.Lock()
 _STREAM_DONE = object()
 
 
@@ -101,7 +312,7 @@ def _sse(payload: dict) -> str:
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(req: ChatRequest):
+async def chat_stream(req: ChatRequest, user: dict = Depends(current_user)):
     """流式对话: 把三个 Agent 的输出实时推给前端 (Server-Sent Events)。
 
     与 /api/chat 的区别: 后者要等整轮协作结束后一次性返回，
@@ -109,13 +320,20 @@ async def chat_stream(req: ChatRequest):
     """
     if not req.message:
         raise HTTPException(status_code=400, detail="消息不能为空")
-    if _chat_lock.locked():
-        raise HTTPException(status_code=409, detail="已有对话正在进行，请稍后再试")
 
-    team = await get_team()
+    check_rate_limit(user["user_id"])
+    key = (user["user_id"], req.session_id)
+    lock = session_lock(key)
+    if lock.locked():
+        raise HTTPException(
+            status_code=409,
+            detail=f"任务 {req.session_id} 已有对话正在进行，请稍后再试或换一个任务",
+        )
+
+    team = await get_team(*key)
     queue: asyncio.Queue = asyncio.Queue()   # 不设上限，避免 Agent 阻塞在 put()
     team.enable_streaming(queue)
-    await _chat_lock.acquire()
+    await lock.acquire()
 
     async def run_chat():
         try:
@@ -154,7 +372,7 @@ async def chat_stream(req: ChatRequest):
             if not task.done():
                 task.cancel()
             team.disable_streaming()
-            _chat_lock.release()
+            lock.release()
 
     return StreamingResponse(
         event_stream(),
@@ -178,10 +396,32 @@ async def index():
 
 
 def run():
+    """启动服务。
+
+    两种部署形态：
+      - 挂反向代理（推荐）：只监听 127.0.0.1，TLS 由代理终止
+      - 直连 HTTPS：配 SSL_CERTFILE / SSL_KEYFILE
+    """
     import uvicorn
 
     setup_logging()
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    kwargs: dict = {}
+    if SSL_CERTFILE and SSL_KEYFILE:
+        kwargs.update(ssl_certfile=SSL_CERTFILE, ssl_keyfile=SSL_KEYFILE)
+        logger.info("直连 HTTPS: https://%s:%s", HOST, PORT)
+    else:
+        logger.info("HTTP 监听 %s:%s（TLS 交给反向代理）", HOST, PORT)
+
+    uvicorn.run(
+        app,
+        host=HOST,
+        port=PORT,
+        # 相信反向代理发来的 X-Forwarded-For / X-Forwarded-Proto：
+        # 否则日志里全是代理的 IP，客户端 IP 就查不出来了。
+        proxy_headers=True,
+        forwarded_allow_ips=FORWARDED_ALLOW_IPS,
+        **kwargs,
+    )
 
 
 if __name__ == "__main__":
