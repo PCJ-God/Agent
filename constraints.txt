@@ -1,0 +1,31 @@
+# 依赖版本约束 —— 记录「实测通过」的版本组合
+#
+# 为什么需要这个文件：
+#   requirements.txt 用的是松下限（agentscope>=0.1.0、openai>=1.0.0、
+#   mem0ai>=0.1.0），直接安装会解析到：
+#       agentscope 2.0.8   （实测版本 1.0.18，主版本跨了 1→2）
+#       openai     3.16.2  （实测版本 2.45.0，主版本跨了 2→3）
+#       mem0ai     2.1.0   （实测版本 1.0.11，主版本跨了 1→2）
+#   代码里的 ReActAgent / Toolkit / DashScopeChatFormatter 都是按 agentscope 1.x
+#   写的，装成 2.x 大概率直接跑不起来。
+#
+# 用法（不要单独用 requirements.txt）：
+#     pip install -r requirements.txt -c constraints.txt
+#
+# 版本来源：开发环境 Python 3.10.20 上实测通过的组合。
+# 已在实际部署目标（Ubuntu 26.04 / Python 3.14.4）上做解析演练验证：
+# 13/13 关键包解析到下列版本，且无需从源码编译。
+
+agentscope==1.0.18
+openai==2.45.0
+dashscope==1.27.6
+mcp==1.29.0
+mem0ai==1.0.11
+qdrant-client==1.19.0
+pydantic==2.12.3
+aiohttp==3.14.3
+PyYAML==6.0.3
+python-dotenv==1.2.2
+fastapi==0.136.3
+uvicorn==0.49.0
+rich==15.0.0
