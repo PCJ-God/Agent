@@ -391,14 +391,20 @@
     const uid = USER_ID ? USER_ID.slice(0, 8) : '未登录';
     mcpFooter.textContent = `MCP: ${mcpState}  |  用户: ${uid}  |  任务: ${SESSION_ID}`;
   }
-  renderFooter();
-
+  // 下面这些 const 必须先声明。mcpFooter 是 const，存在暂时性死区(TDZ)：
+  // 若在这之前调用 renderFooter()，会抛
+  //   "Cannot access 'mcpFooter' before initialization"
+  // 而这句位于内联脚本顶层 —— 异常会中断整个脚本，
+  // 导致后面的 sendBtn.addEventListener / Enter 键监听全部绑不上，
+  // 症状就是「在输入框里打字，但点发送和回车都没反应」。
   const chatArea = document.getElementById('chatArea');
   const userInput = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
   const taskSelect = document.getElementById('taskSelect');
   const newTaskBtn = document.getElementById('newTaskBtn');
   const mcpFooter = document.getElementById('mcpFooter');
+
+  renderFooter();
 
   // 获取 MCP 状态
   api('/health').then(r => r.json()).then(d => {
