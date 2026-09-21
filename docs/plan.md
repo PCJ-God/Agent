@@ -266,7 +266,8 @@ CPU 稳态几乎不吃（都在等 DashScope），吃 CPU 的是启动与团队�
 
 ### 6.1 硬前提
 
-- [ ] **`QDRANT_URL`**：不配就只能单进程跑，且多 worker 起不来（本地文件版单进程独占）。
+- [ ] **`QDRANT_URL`（仅多 worker 需要，不是上线前提）**：不配就只能是单进程；而单进程正是
+      这个应用的推荐形态（见第七节第 1 条），所以初次上线**可以先不配**，本地文件版 Qdrant 够用。
 - [ ] **`agentscope>=0.1.0` 下限过松**（`requirements.txt:4`）：代码用的是 AgentScope 1.x API，
       全新服务器上 `pip install` 可能装出 0.x 直接跑不起来。建议收紧到 `>=1.0.0`。
 - [ ] **`cryptography` 不在依赖清单里**：`scripts/gen_self_signed_cert.py` 依赖它，目前只是

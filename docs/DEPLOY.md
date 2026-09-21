@@ -31,11 +31,20 @@ IPv4 / IPv6 都支持。这意味着**不需要域名、不需要备案**就能�
 # 先确认能从这台机器连上 ACME 端点（大陆机房有时不稳）
 curl -I https://acme-v02.api.letsencrypt.org/directory
 
-sudo apt install -y certbot          # 需要 certbot >= 5.3（--ip-address 是新加的）
-sudo mkdir -p /var/www/html
+# 必须用 snap 装, 不能用 apt: Ubuntu 22.04 的 certbot 是 1.21、24.04 是 2.11,
+# 都远低于支持 --ip-address 所需的 5.3 (webroot 方式需要 5.4)。
+# apt 装出来的版本会直接报 "no such option: --ip-address"。
+sudo snap install --classic certbot
+sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+certbot --version            # 确认是 5.4 以上
+
+# 注意：这个目录必须与 deploy/nginx.conf 里 /.well-known/acme-challenge/ 的 root 一致
+sudo mkdir -p /var/www/certbot
+# 顺序要求: webroot 校验需要 80 端口已经在服务这个目录,
+# 所以要先让 nginx 以「只有 80 端口」的配置跑起来 (见「方案 A1」第 2 步的提示)。
 sudo certbot certonly \
   --preferred-profile shortlived \
-  --webroot --webroot-path /var/www/html \
+  --webroot --webroot-path /var/www/certbot \
   --ip-address <你的公网 IP>
 ```
 
@@ -196,8 +205,15 @@ curl -N -X POST https://你的域名/api/chat/stream \
 sudo apt update
 sudo apt install -y python3-venv git nginx
 
-sudo useradd -r -m -d /opt/agent -s /bin/bash agent
-sudo -u agent git clone <你的仓库地址> /opt/agent
+# 家目录不要直接用 /opt/agent: useradd -m 会往里写 .bashrc 等文件,
+# 之后 git clone 到非空目录会直接失败。所以家目录另放, 应用目录单独建。
+sudo useradd -r -m -d /home/agent -s /bin/bash agent
+sudo mkdir -p /opt/agent
+sudo chown agent:agent /opt/agent
+
+# 必须指定分支! 这个仓库的默认分支是 main, 而 main 上没有本轮改动
+# (认证 / 用户隔离 / deploy 目录)。clone 默认分支等于部署一个没有认证的版本。
+sudo -u agent git clone -b multi-agent <你的仓库地址> /opt/agent
 
 # 依赖接近 1.9 GB：走国内镜像，否则会非常慢
 sudo -u agent python3 -m venv /opt/agent/.venv
@@ -207,7 +223,7 @@ sudo -u agent /opt/agent/.venv/bin/pip install \
 
 # 环境变量：单独填，不要用仓库里的 .env
 sudo -u agent cp /opt/agent/.env.example /opt/agent/.env
-sudo -u agent vim /opt/agent/.env      # 填 DASHSCOPE_API_KEY 等
+sudo -u agent vi /opt/agent/.env       # 填 DASHSCOPE_API_KEY 等
 sudo chmod 600 /opt/agent/.env         # 只有服务账号能读
 ```
 
@@ -219,7 +235,7 @@ sudo chmod 600 /opt/agent/.env         # 只有服务账号能读
    `skills/course-review/SKILL.md` 在该规则生效之前就加入了，所以仍被跟踪；而
    `skills/frontend-design` 没有。直接 clone 到服务器会**少一个 skill**，需要手动 `scp` 补齐。
    对照启动日志里的 `工具池就绪: ... Skill N 个` 就能看出少了几个。
-3. **`QDRANT_URL` 别忘了**，见上面「已知限制」第 2 条。
+3. **`QDRANT_URL` 只有要多 worker 时才需要填。** 单进程部署（这个应用的推荐形态，见「已知限制」第 1 条）用本地文件版 Qdrant 就够了，不必为此再在同一台机器上起一个 Qdrant 容器。上面第 2 条说的是「多 worker 的前提」，不是「上线的前提」。
 
 ## 服务守护（systemd）
 
