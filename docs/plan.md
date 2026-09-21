@@ -89,7 +89,10 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/auth/register` | 发一个 uuid4 token，返回 `{user_id, token, name, created_at}` |
+| `POST` | `/api/auth/register` | 不带凭据 → 匿名账号（打开即用）；带了 → 具名账号 |
+| `POST` | `/api/auth/login` | 用户名 + 密码换一个新 token（见 3.13） |
+| `POST` | `/api/auth/bind` | 给当前匿名账号补上用户名密码（见 3.13） |
+| `POST` | `/api/auth/logout` | 吊销当前 token |
 | `GET` | `/api/auth/me` | 校验 token，返回当前用户 |
 
 除 `/health` 外所有接口挂 `Depends(current_user)`。`session_store.revoke_token(token)` 可吊销。
@@ -97,8 +100,10 @@
 **设计要点**：`user_id` 与 `token` 是**两个不同的 uuid**。因为长期记忆会把 `user_id` 写进
 向量库的 payload，而 token 是凭证 —— 凭证不该出现在数据库的元数据里。
 
-**已知取舍**：token 是「用户名 + 密码」合一，只能靠 HTTPS 保护。要接真正的登录体系，
-只需替换 `current_user`，下游一行都不用改。
+**演进**：3.13 在这个基础上加了账号密码登录。`current_user` 的位置没变，下游
+（记忆作用域、会话归属、配额）一行都没改 —— 当初留的这个口子是有效的。
+**仍然保留的取舍**：token 依旧是「一票通行」的凭证，只能靠 HTTPS 保护，
+拿到 token 就等于拿到账号（密码是另一条独立的路）。
 
 ### 3.2 长期记忆按用户隔离（本轮最关键的一处）
 
@@ -231,6 +236,48 @@ Unknown key 'StartLimitIntervalSec' in section [Service], ignoring
 那里被 `include /etc/nginx/conf.d/*.conf` 做 http 级包含，而 `location` 块
 只能出现在 `server` 块里，放进去 nginx 直接起不来。
 
+### 3.13 账号密码登录（可迁移的凭证）
+
+**起因**：原机制是「匿名自动注册 + 无密码 token」，token 存在浏览器 localStorage。
+换设备 / 换浏览器 / 清缓存之后，服务端数据明明都按 `user_id` 存着，但**没有任何办法
+再证明自己是那个 user_id** —— 历史等于拿不回来。要「登录后看到自己的历史」，
+缺的正是**可迁移的凭证**。
+
+| 文件 | 内容 |
+|------|------|
+| `src/access/passwords.py` | 新增：scrypt 哈希 + 用户名/密码格式校验 |
+| `src/storage/memory/session_store.py` | `users` 加 `username`/`password_hash`；新增 `tokens` 表与 `_migrate_v2` |
+| `src/access/server.py` | 新增 `login` / `bind` / `logout`；`register` 支持带凭据 |
+| `src/access/auth.py` | 新增 `bearer_token` 依赖（登出要拿 token 原文） |
+| `frontend/index.html` | 顶栏「账号」按钮 + 面板（绑定 / 登录 / 退出） |
+
+**为什么用标准库 scrypt**：依赖钉死在 `constraints.txt` 的实测组合上（110 个包），
+每加一个包都要在 Python 3.14 上重新验证一遍，而 PyPI 只走国内镜像。`hashlib.scrypt`
+是内存硬的 KDF，强度够用且零新依赖。存储串自描述
+（`scrypt$n=..,r=..,p=..$salt$hash`），将来换 argon2 只需按前缀分派。
+
+**为什么把凭据「绑」到现有账号，而不是新建账号再搬历史**：`user_id` 是数据归属的唯一
+依据（会话、消息、长期记忆都按它隔离）。搬历史要跨三套存储做复制，任何一步失败都会留下
+半迁移状态；把凭据绑到现有 `user_id` 上，历史天然就在原地。所以网页端「设置用户名密码」
+走的是 `bind`，不是「注册新账号」。
+
+**`users.token` 这列怎么处理**：它是历史列（`NOT NULL UNIQUE`），不能直接删。做法是新老
+并存 —— 存量值一次性搬进 `tokens` 表（老客户端不掉线），之后认证只看 `tokens`；
+`revoke_token` 会把这一列的值改成哨兵值，避免留下「看起来还能用」的凭证。
+
+**踩到的坑（副本测试抓出来的）**：搬存量 token 的语句如果每次 `init_db()` 都跑，那么
+`users.token` 里**之后才出现**的值（也就是登出写的哨兵值）会在下次重启时被当成有效凭证
+重新插进 `tokens` 表 —— 一个已吊销的凭证「复活」了。修法是**只在 `tokens` 为空时搬**：
+这是一次性搬迁，不是每次启动的例行动作。
+
+**登录失败节流**：按用户名记失败次数（5 分钟窗口 / 8 次），超限 429。**取舍**：按用户名
+计数意味着攻击者能用错误密码把某个已知账号短暂锁住；更稳妥要「账号 + 来源 IP」双维度，
+那需要 nginx 传真实 IP。
+
+**前端顺带避开的一处同类隐患**：`ACCOUNT` 是 `let`，且被 `renderFooter()` 读。
+它必须声明在 `renderFooter()` **首次调用之前**，否则就是 3.10 那个 TDZ 崩溃的翻版。
+已在声明处写明原因（4.10 的三层检查会拦住这类回归）。
+
 ---
 
 ## 四、验证记录
@@ -307,6 +354,12 @@ proxy_buffering on （nginx 默认）: 首帧 +15.31s / 总 24.39s → 63%   102
   结构，不是 `deploy/nginx.conf` 原文逐字加载。
 - **LRU 淘汰只做了逻辑层面验证**，没在并发下压测。
 - **限流与 `MAX_TEAMS` 是进程内的**，多 worker 下每个 worker 各算一份 —— 见第七节。
+- **账号面板没在真实浏览器里点过**（见 3.13）。Node + DOM 桩覆盖了逻辑分支与 id 引用，
+  但样式、布局、真实事件绑定仍需人点一遍 —— 这是本轮最该补的一项。
+- **登录失败节流按用户名计数**，所以存在「用错误密码把别人账号锁住」的可能（5 分钟）。
+- **密码只校验长度**（8-128），没有字典/复杂度检查，也没有「改密码 / 忘记密码」流程 ——
+  设错了当前只能换个用户名。
+- **scrypt 的代价参数是本地量的**（单次约 39ms、16MB），没测并发登录下的表现。
 
 ### 4.8 线上真机验收（真实 Let's Encrypt + 真实公网）
 
@@ -343,16 +396,80 @@ https://139.155.146.41/health      -> 200
 
 ### 4.10 前端脚本可执行性检查（可复现的回归手段）
 
-用 Node + 极简 DOM 桩执行 `frontend/index.html` 的内联脚本，捕获顶层异常：
+用 Node + 极简 DOM 桩执行 `frontend/index.html` 的内联脚本
+（`node scripts/check_frontend.js`，从哪个目录跑都可以），三层检查，从弱到强：
 
 ```text
-修复前: ReferenceError: Cannot access 'mcpFooter' before initialization
-修复后: 顶层执行完成，没有抛异常
+1) 顶层执行不抛异常
+   修复前: ReferenceError: Cannot access 'mcpFooter' before initialization
+   修复后: 顶层执行完成，没有抛异常
+
+2) getElementById 引用的 id 在 HTML 里都存在
+   （桩是"什么都能设"的假元素，所以 id 打错时第 1 层照样通过，浏览器里却会崩）
+
+3) 交互路径真跑一遍（绑定 / 登录 / 退出）
+   只看顶层不抛，说明不了这些分支是对的
 ```
 
 **为什么需要这个手段**：HTTP 层返回 200 并不等于页面能用。3.10 那个 bug 在
 「`/health` 200、`/` 返回 24KB HTML、SSE 流式正常」的情况下，页面依然完全不可用。
 只验证 HTTP 层会漏掉这一类问题。
+
+### 4.11 账号密码：副本 → 线上迁移 → 真机端到端
+
+**第一步，在数据库副本上验迁移**（服务不动，把模块级 `SESSIONS_DB` 指向副本）：
+
+```text
+结果: 全部通过   (44 项)
+  迁移不丢人              33 -> 33
+  老 token 仍能查到用户     ✓
+  tokens 无孤儿             ✓
+  重复 init_db 不改动任何一行 ✓ ← 正是这一项抓出了"哨兵值复活"的 bug（见 3.13）
+```
+
+**第二步，线上迁移**（备份 → 装代码 → 显式触发迁移）：
+
+```text
+迁移前备份 (users, sessions, messages): (34, 4, 14)
+迁移后线上 (users, sessions, messages): (34, 4, 14)    ← 不丢任何一行
+users 列 : [... 'username', 'password_hash']
+tokens=34   孤儿token=0   integrity_check: ok
+重复 init_db: 行数一动不动
+```
+
+**一个容易误判的点**：`init_db()` 是**惰性**的，重启服务并不会触发迁移 ——
+要等第一次真正访问存储层。所以「重启完就去看 schema」会把还没迁移误判成迁移失败
+（这次就先误判了一次），得显式调一次 `init_db()` 或用一次真实请求触发。
+
+**第三步，端到端**（`https://lovekiki.site`，TLS + nginx + 应用，不绕任何一层，29 项全过）：
+
+```text
+存量老 token                -> 200        迁移没把现有用户踢下线
+匿名注册                    -> 200        token 43 字符（旧的 uuid4 是 32）
+匿名建任务 → bind 凭据       -> 200        user_id 不变（历史在原地）
+换设备用密码登录             -> 200        新 token、同一 user_id
+  ★ 新设备看到那份历史        -> 200        ← 整个改动的目的
+密码错 / 用户名不存在         -> 401
+用户名大写                   -> 200        不区分大小写
+密码 4 位 / 用户名重复        -> 400 / 409
+登出                        -> 200        该 token 变 401，同账号另一 token 仍 200
+```
+
+**第四步，前端**（`node scripts/check_frontend.js`）：
+
+```text
+1) 顶层执行没有抛异常                              ✓
+2) 12 个 getElementById 的 id 在 HTML 里都存在       ✓
+3) 交互路径 7 项全 PASS：
+   openAccount / renderAccount(anon|login|named) /
+   submitBind / submitLogin（含换账号）/ submitLogout / closeAccount
+```
+
+第 3 层顺带验了「换账号不会把上一个账号的任务 ID 带过去」：调用序列里绑定时是
+`web-mf8dtqpq`，登录后变成 `web-g1tv8x2q`。
+
+**线上前端一致性**：本地 / 服务器上的文件 / HTTPS 实际返回，三份 md5 相同
+（`be543ab4d9e0b06768c170057250026c`）—— 浏览器收到的就是本地测过的那一份。
 
 ---
 
@@ -406,6 +523,8 @@ CPU 稳态几乎不吃（都在等 DashScope），吃 CPU 的是启动与团队�
       **期间修掉一个 bug**：`StartLimit*` 原本写在 `[Service]` 段被 systemd 静默忽略，见 3.11。
 - [ ] **备份 `data/` 未做**：里面是所有人的会话（`data/sessions.db`）与长期记忆
       （`data/memory/`），丢了不可逆。**这仍是当前最该补的一条。**
+      **本轮进展**：数据库改动时留下了迁移前快照 `data/sessions.db.pre-v2.bak`（含
+      `integrity_check: ok`），但那是手工的一次性快照，**不是备份机制** —— 该项仍未完成。
 - [x] **HTTPS 已生效**：真实 Let's Encrypt 证书，域名 + 纯 IP 两个入口，续期 cron 已装并用
       `--dry-run` 验证通过。`FORWARDED_ALLOW_IPS` 保持 `127.0.0.1`。验证见 4.8 / 4.9。
 
@@ -441,6 +560,10 @@ CPU 稳态几乎不吃（都在等 DashScope），吃 CPU 的是启动与团队�
    （表现为域名突然不通，而纯 IP 仍正常）。故保留纯 IP 入口（独立 server 块 + IP 证书）
    作为退路。但 IP 证书走 `shortlived` 档案**只有 6 天**，续期失灵 = HTTPS 六天后失效，
    所以两个入口都依赖同一条续期 cron。
+7. **账号密码没有「改密码 / 忘记密码」**：`attach_credentials` 只允许匿名账号绑一次，
+   具名账号不能被覆盖，所以密码设错了当前只能换个用户名重新绑定（见 4.7）。
+   token 依旧是 `localStorage` 里的一票通行凭证 —— HTTPS 仍然不是可选项。
+   另外登录失败节流按用户名计数，存在「用错误密码锁住别人账号」的可能（5 分钟）。
 
 ---
 
@@ -467,6 +590,19 @@ CPU 稳态几乎不吃（都在等 DashScope），吃 CPU 的是启动与团队�
    彼时页面完全不可用（3.10）。**验证必须覆盖到用户实际使用的那一层。**
 7. **在一份自查清单里列了不存在的文件名**（`src/access/ratelimit.py`）—— 限流其实写在
    `server.py` 里，那个路径是我凭印象写的。**凡是写进脚本或文档的路径，先确认它存在。**
+
+以下三条出自**账号密码登录这一轮**：
+
+8. **把「重启服务」当成「会跑数据库迁移」** —— `init_db()` 是惰性的，只在第一次访问存储层
+   时才执行。部署脚本里写的判据是「重启后检查新表」，于是表还没建，当场误判成迁移失败。
+   **不要假设启动会做副作用；要验就显式触发一次（或发一个真实请求）。**
+9. **断言失败时先怀疑了被测代码** —— 副本测试报了 3 项失败，逐个核对后**全是断言自己的
+   问题**（吊销了 `t2` 却去查 `users.token`；拿「重复 `init_db` 后的数量」去比「中间新建过
+   用户的数量」）。**断言失败的第一步是证明断言本身是对的。**（同一轮也确实抓到一个真
+   bug —— 见 3.13 的「哨兵值复活」，所以这一步不是白跑的。）
+10. **改 `users.token` 的写入语义时，漏掉了「每次 `init_db()` 都会读这一列」这条既有路径** ——
+    于是吊销时写的哨兵值会在下次启动被当成有效凭证搬回 `tokens` 表。**改一个字段的语义，
+    要先把所有读写它的路径列全，包括那些"看起来只是初始化"的路径。**
 
 ---
 
