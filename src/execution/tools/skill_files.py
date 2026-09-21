@@ -31,8 +31,11 @@ logger = logging.getLogger(__name__)
 #: 单个文件返回上限。正文可能很长，截断也好过把上下文一次撑爆。
 MAX_BYTES = 200_000
 
-#: 只从 SKILL.md 头部认 frontmatter 的 name —— 不为此引入 YAML 依赖
-_NAME_RE = re.compile(r"^name:\s*(.+?)\s*$", re.MULTILINE)
+#: 只从 SKILL.md 头部认 frontmatter 的 name / description —— 不为此引入 YAML 依赖
+_META_RE = {
+    "name": re.compile(r"^name:\s*(.+?)\s*$", re.MULTILINE),
+    "description": re.compile(r"^description:\s*(.+?)\s*$", re.MULTILINE),
+}
 _HEAD_BYTES = 4000
 
 #: 技能总说明：框架默认那份只说「必须读 SKILL.md」，没点名工具
@@ -55,16 +58,29 @@ class SkillReadError(Exception):
     """读取技能文件失败：技能不存在、路径越界、文件过大或不存在。"""
 
 
-def _frontmatter_name(skill_dir: Path) -> str:
-    """技能名：优先取 SKILL.md frontmatter 里的 name，退回目录名。"""
+def frontmatter_meta(skill_dir: Path) -> dict[str, str]:
+    """从 SKILL.md 头部读 name / description（不为此引入 YAML 依赖）。
+
+    只看首部若干字节、只认单行标量：折叠式多行描述会只取到第一行，展示够用 ——
+    真正的解析交给 agentscope 的 frontmatter。
+    """
+    meta = {"name": skill_dir.name, "description": ""}
     try:
         head = skill_dir.joinpath("SKILL.md").read_text(
             encoding="utf-8", errors="replace"
         )[:_HEAD_BYTES]
     except OSError:
-        return skill_dir.name
-    m = _NAME_RE.search(head)
-    return m.group(1).strip().strip("\"'") if m else skill_dir.name
+        return meta
+    for key, rx in _META_RE.items():
+        m = rx.search(head)
+        if m:
+            meta[key] = m.group(1).strip().strip("\"'")
+    return meta
+
+
+def frontmatter_name(skill_dir: Path) -> str:
+    """技能名：优先取 SKILL.md frontmatter 里的 name，退回目录名。"""
+    return frontmatter_meta(skill_dir)["name"]
 
 
 def build_skill_map(skill_dirs: list[str]) -> dict[str, Path]:
@@ -77,7 +93,7 @@ def build_skill_map(skill_dirs: list[str]) -> dict[str, Path]:
     out: dict[str, Path] = {}
     for d in skill_dirs:
         p = Path(d)
-        for key in (p.name, _frontmatter_name(p)):
+        for key in (p.name, frontmatter_name(p)):
             out.setdefault(key.lower(), p)
     return out
 

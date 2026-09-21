@@ -24,7 +24,12 @@ from src.execution.agents.agent_factory import (
 from src.execution.agents.react_agent import create_react_agent
 from src.execution.tools.tool_manager import ToolPool, create_mcp_client
 from src.storage.memory.long_term import create_long_term_memory
-from src.storage.memory.session_store import append_turn, ensure_session, recent_turns
+from src.storage.memory.session_store import (
+    append_turn,
+    ensure_session,
+    materialize_user_skills,
+    recent_turns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +140,14 @@ class HierarchicalTeam:
         self.user_id = user_id
         self.mcp_client = await create_mcp_client()
         self.long_term_memory = _create_shared_long_term_memory(session_id, user_id)
-        self.tool_pool = await ToolPool.create(self.mcp_client)
+        # 用户自建技能：库里是唯一事实来源，这里物化成磁盘目录再入池。
+        # 装配只发生在「团队被创建 / 重建」时 —— 所以增删技能后必须让该用户的缓存
+        # 团队失效（见 server.py 的 invalidate_user_teams），否则改动要等 LRU 淘汰
+        # 才会生效。sqlite 与写文件都是阻塞调用，扔线程池。
+        user_skill_dirs = await asyncio.to_thread(materialize_user_skills, user_id)
+        self.tool_pool = await ToolPool.create(
+            self.mcp_client, extra_skill_dirs=user_skill_dirs
+        )
 
         # ── 执行层: Member Agents ──
         # 注意 new_toolkit() 是「从池里复制一份」，不是共享同一个 Toolkit ——

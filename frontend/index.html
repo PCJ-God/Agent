@@ -395,6 +395,141 @@
     color: var(--text-muted);
     word-break: break-word;
   }
+  /* ── 导航 + 抽屉（扩展功能）──────────────────────────────
+     设计取向：这是「一台正在协作的机器的控制台」，不是聊天工具。
+     所以：
+       · 侧栏从静态架构说明改成**真导航**（那四行说明原本占着最贵的位置）
+       · 新功能用**抽屉**而不是新页面 —— 管工具时不该丢掉对话上下文
+       · 角色色是**有语义的**（这条信息是谁产出的），不是装饰
+       · 空状态是"邀请行动"，报错说清发生了什么、怎么修，不空泛
+     ──────────────────────────────────────────────────────── */
+  :root {
+    --role-leader: #e0a458;   /* 调度层：Leader */
+    --role-exec: #6fb3a8;     /* 执行层：Researcher */
+    --role-review: #b48ead;   /* 审查：Reviewer */
+    --role-store: #7d8590;    /* 存储层 / 元信息 */
+  }
+
+  .nav { display: flex; flex-direction: column; gap: 2px; padding: 10px; }
+  .nav-item {
+    display: flex; align-items: baseline; gap: 10px;
+    width: 100%; padding: 9px 10px;
+    background: none; border: none; border-radius: 6px;
+    cursor: pointer; text-align: left;
+    color: var(--text-muted);
+    font-family: var(--sans); font-size: 13px;
+  }
+  .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+  .nav-item[aria-current="true"] {
+    background: var(--surface-hover); color: var(--text);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .nav-item .k { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--role-store); }
+  .nav-hint {
+    padding: 2px 20px 12px;
+    font-size: 11px; line-height: 1.7; color: var(--text-muted);
+  }
+  .role-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; }
+  .role-dot.leader { background: var(--role-leader); }
+  .role-dot.exec   { background: var(--role-exec); }
+  .role-dot.review { background: var(--role-review); }
+
+  /* ── 抽屉 ── */
+  .drawer-mask {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .drawer {
+    position: fixed; z-index: 51; top: 0; right: 0; bottom: 0;
+    width: min(94vw, 460px);
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -20px 0 50px rgba(0, 0, 0, 0.45);
+    animation: drawer-in 0.18s ease-out;
+  }
+  @keyframes drawer-in { from { transform: translateX(14px); opacity: 0.4; } }
+  @media (prefers-reduced-motion: reduce) {
+    .drawer { animation: none; }
+  }
+  .drawer-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding: 18px 18px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .drawer-head h2 { font-size: 15px; font-weight: 600; }
+  .drawer-sub { margin-top: 4px; font-size: 11px; line-height: 1.6; color: var(--text-muted); }
+  .x-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 20px; line-height: 1;
+  }
+  .x-btn:hover { color: var(--text); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px 28px; }
+
+  .sec-title {
+    display: flex; align-items: baseline; gap: 8px;
+    margin: 4px 0 10px;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .sec-title .n { font-family: var(--mono); color: var(--role-store); }
+  .sec-title.mine { margin-top: 22px; }
+
+  .skill-card {
+    padding: 12px 13px; margin-bottom: 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .skill-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .skill-card .slug { font-family: var(--mono); font-size: 10px; color: var(--role-exec); }
+  .skill-card .desc { margin-top: 6px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+  .skill-card .acts { display: flex; gap: 12px; margin-top: 10px; font-size: 12px; }
+  .skill-card .acts button {
+    background: none; border: none; cursor: pointer; padding: 0;
+    color: var(--text-muted); font-family: inherit; font-size: 12px;
+    text-decoration: underline;
+  }
+  .skill-card .acts button:hover { color: var(--text); }
+  .skill-card .acts button.danger:hover { color: var(--red); }
+  .badge {
+    display: inline-block; margin-left: 6px; padding: 1px 6px;
+    border: 1px solid var(--border); border-radius: 999px;
+    font-size: 10px; color: var(--role-store);
+  }
+
+  .empty {
+    padding: 18px 14px;
+    border: 1px dashed var(--border); border-radius: 8px;
+    font-size: 12px; line-height: 1.8; color: var(--text-muted);
+  }
+  .empty b { color: var(--text); font-weight: 600; }
+
+  .field { display: block; margin-bottom: 10px; }
+  .field > span { display: block; margin-bottom: 4px; font-size: 11px; color: var(--text-muted); }
+  .field .hint { color: var(--role-store); }
+  .field input, .field textarea {
+    width: 100%; padding: 9px 10px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: var(--sans); font-size: 13px;
+  }
+  .field textarea { min-height: 150px; resize: vertical; font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+
+  .row-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-primary {
+    flex: 1; padding: 10px; cursor: pointer;
+    background: var(--accent); border: none; border-radius: 6px;
+    color: #fff; font-family: inherit; font-size: 13px;
+  }
+  .btn-primary:disabled { opacity: 0.6; cursor: default; }
+  .btn-ghost {
+    padding: 10px 14px; cursor: pointer;
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-muted); font-family: inherit; font-size: 13px;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+
+  .msgline { margin-top: 12px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+  .msgline.ok { color: var(--green); }
+  .msgline.err { color: var(--red); }
 </style>
 </head>
 <body>
@@ -404,11 +539,23 @@
     <h2>Agent 系统</h2>
     <div class="status">Hierarchical 层级协作</div>
   </div>
-  <div class="arch-info">
-    <div class="arch-layer"><span class="label">接入层</span> <span class="desc">CLI / FastAPI</span></div>
-    <div class="arch-layer"><span class="label">调度层</span> <span class="desc">Leader 任务分配</span></div>
-    <div class="arch-layer"><span class="label">执行层</span> <span class="desc">Researcher + Reviewer</span></div>
-    <div class="arch-layer"><span class="label">存储层</span> <span class="desc">任务历史 + 长期记忆</span></div>
+  <!-- 侧栏是真导航，不再是架构说明。角色点用语义色，后面消息气泡会复用同一套。 -->
+  <nav class="nav">
+    <button class="nav-item" id="navChat" aria-current="true">
+      <span class="role-dot exec"></span><span>对话</span>
+    </button>
+    <button class="nav-item" id="navSkills" data-tab="skills">
+      <span class="role-dot leader"></span><span>技能</span>
+      <span class="k" id="navSkillsCount"></span>
+    </button>
+    <button class="nav-item" id="navMcp" data-tab="mcp">
+      <span class="role-dot review"></span><span>MCP 服务</span>
+      <span class="k" id="navMcpState"></span>
+    </button>
+  </nav>
+  <div class="nav-hint">
+    技能是你能直接改的那一层：Agent 只按名字和描述判断该不该用，
+    决定要用时才会自己去读正文。
   </div>
   <div class="sidebar-footer" id="mcpFooter">MCP: 连接中...</div>
 </aside>
@@ -424,7 +571,7 @@
   <div class="chat-area" id="chatArea">
     <div class="welcome">
       <h1>Agent 智能体系统</h1>
-      <p>四层架构: 接入层 → 调度层(Leader) → 执行层(Researcher + Reviewer + MCP/Skills) → 存储层(Memory)</p>
+      <p>直接在下面提问。左侧「技能」可以把你自己的做法写成技能，Agent 需要时会自己去读。</p>
     </div>
   </div>
 
@@ -448,6 +595,19 @@
   <div id="acctBody"></div>
   <div class="acct-msg" id="acctMsg"></div>
 </div>
+
+<!-- 扩展抽屉：技能管理（MCP 随后）。用抽屉而不是新页面 —— 管工具时不该丢掉对话上下文。 -->
+<div class="drawer-mask" id="drawerMask" hidden></div>
+<aside class="drawer" id="drawer" hidden>
+  <div class="drawer-head">
+    <div>
+      <h2 id="drawerTitle">技能</h2>
+      <p class="drawer-sub" id="drawerSub"></p>
+    </div>
+    <button class="x-btn" id="drawerClose" title="关闭">&times;</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
 
 <!-- 渲染依赖 (jsdelivr): Markdown / XSS 消毒 / LaTeX 公式 -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
@@ -985,7 +1145,7 @@
     chatArea.innerHTML = `
       <div class="welcome">
         <h1>Agent 智能体系统</h1>
-        <p>四层架构: 接入层 → 调度层(Leader) → 执行层(Researcher + Reviewer + MCP/Skills) → 存储层(Memory)</p>
+        <p>直接在下面提问。左侧「技能」可以把你自己的做法写成技能，Agent 需要时会自己去读。</p>
       </div>`;
   }
 
@@ -1115,6 +1275,366 @@
     await refreshTaskList();
     await loadLatestPage();
   })();
+
+  // ── 扩展抽屉：技能管理 ──────────────────────────────────────────────
+  // 追加在脚本末尾（启动 IIFE 之后）是刻意的：上面所有 const 都已初始化，
+  // 不会踩到前面注释里说的那种 TDZ 崩溃。
+  //
+  // 语义：技能存在服务端库里，磁盘上的 SKILL.md 只是给 Agent 读的物化视图。
+  // 增删改之后服务端会让该用户的缓存团队失效 → **下一次提问就生效**，
+  // 所以界面就这么写，别说成"要重启服务"。
+  //
+  // 注意 agent 只拿到名字和描述，正文要它自己调 read_skill_file 去读 ——
+  // 所以"描述"这一栏决定技能会不会被用上，值得写清楚。
+  const drawer = document.getElementById('drawer');
+  const drawerMask = document.getElementById('drawerMask');
+  const drawerBody = document.getElementById('drawerBody');
+  const drawerTitle = document.getElementById('drawerTitle');
+  const drawerSub = document.getElementById('drawerSub');
+  const drawerClose = document.getElementById('drawerClose');
+  const navChat = document.getElementById('navChat');
+  const navSkills = document.getElementById('navSkills');
+  const navMcp = document.getElementById('navMcp');
+  const navSkillsCount = document.getElementById('navSkillsCount');
+  const navMcpState = document.getElementById('navMcpState');
+
+  const SKILLS_SUB =
+    '正文不进模型上下文：Agent 只看到名字和描述，决定要用时才自己去读它。';
+  const MCP_SUB = '外部工具是 Agent 的手，配好之后它才调得到。';
+
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function msgLine(text, kind) {
+    return el('div', 'msgline' + (kind ? ' ' + kind : ''), text);
+  }
+
+  // 侧栏高亮：抽屉关掉时回到"对话"，因为对话一直在后面
+  function navSet(active) {
+    [navChat, navSkills, navMcp].forEach((b) => {
+      if (b) b.setAttribute('aria-current', b === active ? 'true' : 'false');
+    });
+  }
+
+  function field(label, kind, hint) {
+    const wrap = el('label', 'field');
+    const cap = el('span', null, label);
+    if (hint) cap.appendChild(el('span', 'hint', ' · ' + hint));
+    const input = document.createElement(kind === 'area' ? 'textarea' : 'input');
+    wrap.append(cap, input);
+    return { wrap, input };
+  }
+
+  function skillCard(s, editable) {
+    const card = el('div', 'skill-card');
+    const h = el('h3', null, s.name || s.slug);
+    if (!editable) h.appendChild(el('span', 'badge', '内置'));
+    card.appendChild(h);
+    card.appendChild(el('div', 'slug', s.slug));
+    if (s.description) card.appendChild(el('div', 'desc', s.description));
+    if (editable) {
+      const acts = el('div', 'acts');
+      const bEdit = el('button', null, '编辑');
+      bEdit.addEventListener('click', () => renderSkillForm(s));
+      const bDel = el('button', 'danger', '删除');
+      bDel.addEventListener('click', () => confirmDelete(s, card));
+      acts.append(bEdit, bDel);
+      card.appendChild(acts);
+    }
+    return card;
+  }
+
+  async function renderSkills() {
+    drawerBody.textContent = '';
+    drawerBody.appendChild(msgLine('正在读取技能…'));
+
+    let list;
+    try {
+      const r = await api('/api/skills');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      list = await r.json();
+    } catch (e) {
+      drawerBody.textContent = '';
+      drawerBody.appendChild(
+        msgLine('没读到技能列表（' + e.message + '）。检查网络后点左侧「技能」重试。', 'err')
+      );
+      return;
+    }
+
+    const builtin = list.filter((s) => s.builtin);
+    const mine = list.filter((s) => !s.builtin);
+    if (navSkillsCount) navSkillsCount.textContent = mine.length ? String(mine.length) : '';
+
+    drawerBody.textContent = '';
+
+    const t1 = el('div', 'sec-title');
+    t1.append(el('span', null, '内置技能'), el('span', 'n', String(builtin.length)));
+    drawerBody.appendChild(t1);
+    builtin.forEach((s) => drawerBody.appendChild(skillCard(s, false)));
+
+    const t2 = el('div', 'sec-title mine');
+    t2.append(el('span', null, '我的技能'), el('span', 'n', String(mine.length)));
+    drawerBody.appendChild(t2);
+
+    if (mine.length === 0) {
+      const empty = el('div', 'empty');
+      empty.append(
+        el('b', null, '还没有自定义技能。'),
+        document.createTextNode(
+          '写下"什么时候该用、按什么步骤做"，比如你们团队的评审标准、简历的写法。' +
+            'Agent 需要时会自己读到它。'
+        )
+      );
+      drawerBody.appendChild(empty);
+    } else {
+      mine.forEach((s) => drawerBody.appendChild(skillCard(s, true)));
+    }
+
+    const add = el('button', 'btn-primary', '新建技能');
+    add.addEventListener('click', () => renderSkillForm(null));
+    drawerBody.appendChild(add);
+  }
+
+  function renderSkillForm(existing) {
+    const isNew = !existing;
+    drawerBody.textContent = '';
+    drawerBody.appendChild(
+      msgLine(
+        isNew
+          ? '写清「什么时候该用、怎么做」。描述是 Agent 唯一能看到的线索，别写太泛。'
+          : '改了立刻生效，不用重启服务 —— 下一次提问就带上新版本。'
+      )
+    );
+
+    const fSlug = field('目录名', 'input', isNew ? '小写字母/数字/横线，建好后不可改' : '不可修改');
+    fSlug.input.value = isNew ? '' : existing.slug;
+    fSlug.input.disabled = !isNew;
+    fSlug.input.placeholder = 'team-review';
+
+    const fName = field('名称', 'input');
+    fName.input.value = isNew ? '' : existing.name || '';
+    fName.input.placeholder = '团队评审标准';
+
+    const fDesc = field('描述', 'input', 'Agent 靠这句话判断该不该用');
+    fDesc.input.value = isNew ? '' : existing.description || '';
+    fDesc.input.placeholder = '写简历或方案时用来对照的检查清单';
+
+    const fBody = field('正文', 'area', 'Markdown，模型按需读取');
+    fBody.input.value = isNew ? '' : existing.body || '';
+    fBody.input.placeholder = '## 什么时候用\n…\n## 检查清单\n- …';
+
+    const msg = el('div', 'msgline');
+    const save = el('button', 'btn-primary', isNew ? '创建' : '保存');
+    save.addEventListener('click', () => submitSkillForm(existing, save, msg, {
+      slug: fSlug, name: fName, desc: fDesc, body: fBody,
+    }));
+    const cancel = el('button', 'btn-ghost', '返回列表');
+    cancel.addEventListener('click', () => renderSkills());
+    const btns = el('div', 'row-btns');
+    btns.append(save, cancel);
+
+    drawerBody.append(fSlug.wrap, fName.wrap, fDesc.wrap, fBody.wrap, btns, msg);
+  }
+
+  async function submitSkillForm(existing, btn, msg, f) {
+    btn.disabled = true;
+    msg.className = 'msgline';
+    msg.textContent = '保存中…';
+    try {
+      const r = existing
+        ? await api('/api/skills/' + encodeURIComponent(existing.skill_id), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: f.name.input.value.trim(),
+              description: f.desc.input.value.trim(),
+              body: f.body.input.value,
+            }),
+          })
+        : await api('/api/skills', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              slug: f.slug.input.value.trim(),
+              name: f.name.input.value.trim(),
+              description: f.desc.input.value.trim(),
+              body: f.body.input.value,
+            }),
+          });
+      if (!r.ok) {
+        // FastAPI 的校验错误 detail 是数组，得挑出 msg
+        const d = await r.json().catch(() => ({}));
+        const detail = Array.isArray(d.detail)
+          ? d.detail.map((x) => x.msg || '').join('；')
+          : d.detail;
+        throw new Error(detail || 'HTTP ' + r.status);
+      }
+      await renderSkills();
+      // renderSkills 重建了列表，所以结果行重新插到最上面
+      drawerBody.insertBefore(
+        msgLine('已保存，下一次提问就会用上。', 'ok'),
+        drawerBody.firstChild
+      );
+    } catch (e) {
+      msg.className = 'msgline err';
+      msg.textContent = '没保存成功：' + e.message;
+      btn.disabled = false;
+    }
+  }
+
+  // 两步确认，不用原生 confirm：它会打断页面，也没法把后果说清楚
+  function confirmDelete(s, card) {
+    const acts = card.querySelector('.acts');
+    if (!acts) return;
+    acts.textContent = '';
+    const ask = el('span', 'desc', '删掉「' + (s.name || s.slug) + '」？');
+    const yes = el('button', 'danger', '确认删除');
+    const no = el('button', null, '取消');
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        const r = await api('/api/skills/' + encodeURIComponent(s.skill_id), {
+          method: 'DELETE',
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        await renderSkills();
+        drawerBody.insertBefore(
+          msgLine('已删除。下一次提问就不再带这个技能了。', 'ok'),
+          drawerBody.firstChild
+        );
+      } catch (e) {
+        yes.disabled = false;
+        acts.textContent = '';
+        acts.appendChild(el('span', 'desc', '没删掉：' + e.message));
+      }
+    });
+    no.addEventListener('click', () => renderSkills());
+    acts.append(ask, yes, no);
+  }
+
+  const MCP_STATE_TEXT = {
+    connected: '已连通',
+    unreachable: '连不上',
+    unavailable: '未配置',
+  };
+
+  async function renderMcp() {
+    drawerBody.textContent = '';
+    drawerBody.appendChild(msgLine('正在实测连通性…'));
+
+    let d;
+    try {
+      const r = await api('/api/mcp');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      d = await r.json();
+    } catch (e) {
+      drawerBody.textContent = '';
+      drawerBody.appendChild(
+        msgLine('没读到 MCP 状态（' + e.message + '）。检查网络后点左侧「MCP 服务」重试。', 'err')
+      );
+      return;
+    }
+
+    drawerBody.textContent = '';
+
+    const t = el('div', 'sec-title');
+    t.append(el('span', null, '实测状态'), el('span', 'n', MCP_STATE_TEXT[d.status] || d.status));
+    drawerBody.appendChild(t);
+
+    const card = el('div', 'skill-card');
+    card.appendChild(el('h3', null, d.name || '（未配置服务）'));
+    const where = [d.transport, d.host].filter(Boolean).join(' · ');
+    if (where) card.appendChild(el('div', 'slug', where));
+    card.appendChild(
+      el(
+        'div',
+        'desc',
+        d.status === 'connected'
+          ? '连得上，Agent 能调用下面这些工具。'
+          : d.status === 'unreachable'
+            ? '连不上，Agent 会降级成「只有技能和内置工具」。原因：' + (d.detail || '未知')
+            : '没有配置 MCP 服务，目前只有技能和内置工具可用。'
+      )
+    );
+    drawerBody.appendChild(card);
+
+    const t2 = el('div', 'sec-title mine');
+    t2.append(el('span', null, '可用工具'), el('span', 'n', String((d.tools || []).length)));
+    drawerBody.appendChild(t2);
+    if (!d.tools || d.tools.length === 0) {
+      drawerBody.appendChild(msgLine('没有取到工具。'));
+    } else {
+      d.tools.forEach((name) => {
+        const c = el('div', 'skill-card');
+        c.appendChild(el('h3', null, name));
+        drawerBody.appendChild(c);
+      });
+    }
+
+    // 把"为什么这里是只读的"讲清楚，而不是留一个没有下文的占位
+    const note = el('div', 'empty');
+    note.append(
+      el('b', null, '这里是只读的：'),
+      document.createTextNode(
+        '现在的 MCP 是服务端配置文件里写死的一个远程服务（' +
+          (d.name ? d.name + '，' : '') +
+          '地址和密钥都只在服务端）。要支持自己添加 MCP 服务器，得先定两件事：' +
+          '谁能加（影响加到谁的账号下）、密钥存在哪里 —— 那等于允许 Agent ' +
+          '向你填的任意地址发请求，不该顺手打开。'
+      )
+    );
+    drawerBody.appendChild(note);
+  }
+
+  function openDrawer(tab) {
+    drawer.hidden = false;
+    drawerMask.hidden = false;
+    drawer.setAttribute('aria-hidden', 'false');
+    if (tab === 'mcp') {
+      drawerTitle.textContent = 'MCP 服务';
+      drawerSub.textContent = MCP_SUB;
+      navSet(navMcp);
+      renderMcp();
+    } else {
+      drawerTitle.textContent = '技能';
+      drawerSub.textContent = SKILLS_SUB;
+      navSet(navSkills);
+      renderSkills();
+    }
+  }
+
+  function closeDrawer() {
+    drawer.hidden = true;
+    drawerMask.hidden = true;
+    drawer.setAttribute('aria-hidden', 'true');
+    navSet(navChat); // 关掉抽屉就是回到对话
+  }
+
+  navChat.addEventListener('click', () => {
+    closeDrawer();
+    navSet(navChat);
+  });
+  navSkills.addEventListener('click', () => openDrawer('skills'));
+  navMcp.addEventListener('click', () => openDrawer('mcp'));
+  drawerClose.addEventListener('click', closeDrawer);
+  drawerMask.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !drawer.hidden) closeDrawer();
+  });
+  navSet(navChat);
+
+  // 侧栏顺带显示 MCP 状态（健康检查那条是启动时发的，这里再确认一次口径一致）
+  api('/health')
+    .then((r) => r.json())
+    .then((d) => {
+      mcpState = d.mcp || mcpState;
+      if (navMcpState) navMcpState.textContent = mcpState;
+    })
+    .catch(() => {});
 </script>
 </body>
 </html>

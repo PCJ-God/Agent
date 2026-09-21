@@ -11,6 +11,9 @@ load_dotenv()
 # ==================== 路径配置 ====================
 PROJECT_ROOT = Path(__file__).parent.parent
 SKILLS_DIR = PROJECT_ROOT / "skills"
+#: 用户自建技能的物化目录（<- SQLite 里的 user_skills 表）。
+#: 库是唯一事实来源，这里只是给 agentscope 用的视图 —— 它只认目录里的 SKILL.md。
+USER_SKILLS_DIR = PROJECT_ROOT / "data" / "skills"
 
 
 # ==================== API 配置 ====================

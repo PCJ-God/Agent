@@ -1,14 +1,16 @@
 """
 用户与会话（任务）存储 — SQLite
 
-两层数据：
-  users      —— 用户。`username` / `password_hash` 为 NULL 表示匿名账号
-               （仍然只用 token，保持「打开即用、无需注册」的体验）。
-  tokens     —— 凭证。一个用户可有多条 token（多设备各自登录/登出；
-               登出只删自己那一条，既不影响其他设备，也不删账号本身）。
-  sessions   —— 一个会话 = 一个任务。主键是 (user_id, session_id)，
-               所以不同用户即使传同一个 session_id 也互不可见。
-  messages   —— 对话历史，按 (user_id, session_id) 归属，支持游标分页。
+数据表：
+  users        —— 用户。`username` / `password_hash` 为 NULL 表示匿名账号
+                 （仍然只用 token，保持「打开即用、无需注册」的体验）。
+  tokens       —— 凭证。一个用户可有多条 token（多设备各自登录/登出；
+                 登出只删自己那一条，既不影响其他设备，也不删账号本身）。
+  sessions     —— 一个会话 = 一个任务。主键是 (user_id, session_id)，
+                 所以不同用户即使传同一个 session_id 也互不可见。
+  messages     —— 对话历史，按 (user_id, session_id) 归属，支持游标分页。
+  user_skills  —— 用户自建技能。**库是唯一事实来源**，`materialize_user_skills()`
+                 把它物化成磁盘目录（agentscope 只认目录里的 SKILL.md）。
 
 用户维度是隔离的根：长期记忆按 user_id 打 payload，会话按 user_id 归属，
 任何查询都必须带上它。
@@ -16,14 +18,20 @@
 只用标准库 sqlite3，不引入新依赖。方法都是同步阻塞的，调用方负责用
 `asyncio.to_thread(...)` 包一层（见 src/access/server.py 与 hierarchical.py）。
 """
+import json
+import logging
+import re
 import secrets
+import shutil
 import sqlite3
 import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from src.config import SESSIONS_DB
+from src.config import SESSIONS_DB, USER_SKILLS_DIR
+
+logger = logging.getLogger(__name__)
 
 _init_lock = threading.Lock()
 _initialized = False
@@ -159,6 +167,33 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
     )
 
 
+_SKILLS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS user_skills (
+    skill_id    TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL,
+    slug        TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_skills_slug
+    ON user_skills(user_id, slug);
+"""
+
+
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """v3：用户自建技能。
+
+    正文存库（唯一事实来源），磁盘目录只是给 agentscope 用的**物化视图** ——
+    它只认目录里的 SKILL.md。这样备份跟着 data/sessions.db 一起走，
+    也不会出现「库里有、盘上没了」的漂移。
+    """
+    conn.executescript(_SKILLS_SCHEMA)
+
+
 def init_db() -> None:
     """建表 + 迁移（幂等）。"""
     global _initialized
@@ -169,7 +204,257 @@ def init_db() -> None:
             _migrate_v1(conn)
             conn.executescript(_SCHEMA)
             _migrate_v2(conn)
+            _migrate_v3(conn)
         _initialized = True
+
+
+# ── 用户自建技能 ──
+#: 用户可见的技能目录名（slug）。只允许小写字母数字和横线 —— 它同时是磁盘目录名，
+#: 所以从入口就要杜绝路径穿越（物化时会再校验一次）。
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+#: 路径片段的兜底校验（user_id / slug 用）。比 slug 宽松，但排除分隔符与 ..
+_SEGMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+MAX_SKILL_BODY = 20_000
+MAX_SKILL_DESC = 500
+MAX_SKILLS_PER_USER = 20
+
+
+class SkillValidationError(ValueError):
+    """技能字段不合法：slug 格式、长度、重名或数量超限。"""
+
+
+def _safe_segment(value: str) -> str | None:
+    """能安全地当路径名就返回它，否则 None。"""
+    v = (value or "").strip()
+    if v in {"", ".", ".."} or not _SEGMENT_RE.match(v):
+        return None
+    return v
+
+
+def _validate_skill_fields(slug: str, name: str, description: str, body: str) -> None:
+    if not _SLUG_RE.match(slug):
+        raise SkillValidationError(
+            "技能目录名只能是小写字母、数字或横线（1-40 位，且以字母或数字开头）"
+        )
+    if not name.strip():
+        raise SkillValidationError("技能名称不能为空")
+    if len(name) > 60:
+        raise SkillValidationError("技能名称最长 60 字")
+    if len(description) > MAX_SKILL_DESC:
+        raise SkillValidationError(f"技能描述最长 {MAX_SKILL_DESC} 字")
+    if not body.strip():
+        raise SkillValidationError("技能正文不能为空")
+    if len(body) > MAX_SKILL_BODY:
+        raise SkillValidationError(f"技能正文最长 {MAX_SKILL_BODY} 字")
+
+
+_SKILL_COLS = "skill_id, slug, name, description, body, created_at, updated_at"
+
+
+def list_user_skills(user_id: str) -> list[dict]:
+    """列出某个用户的技能。
+
+    带上 body 是有意的：前端「编辑」要直接预填正文，否则用户改一个错字就得
+    全文重打。列表接口本来就是这个用户在界面上唯一的数据来源。
+    """
+    init_db()
+    with _db() as conn:
+        rows = conn.execute(
+            f"SELECT {_SKILL_COLS} FROM user_skills WHERE user_id = ? "
+            "ORDER BY updated_at DESC, slug",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_user_skill(user_id: str, skill_id: str) -> dict | None:
+    """取单个技能（含正文）。**按 user_id 过滤** —— 别人的 skill_id 一律查不到。"""
+    init_db()
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT * FROM user_skills WHERE user_id = ? AND skill_id = ?",
+            (user_id, skill_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def create_user_skill(
+    user_id: str,
+    slug: str,
+    name: str,
+    description: str = "",
+    body: str = "",
+) -> dict:
+    """新建技能。slug 在同一用户下唯一。
+
+    Raises:
+        SkillValidationError: 字段不合法、slug 重名或超过数量上限
+    """
+    init_db()
+    slug = (slug or "").strip().lower()
+    name = (name or "").strip()
+    description = (description or "").strip()
+    _validate_skill_fields(slug, name, description, body)
+
+    skill_id = uuid.uuid4().hex
+    now = _now()
+    with _db() as conn:
+        n = conn.execute(
+            "SELECT count(*) FROM user_skills WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
+        if n >= MAX_SKILLS_PER_USER:
+            raise SkillValidationError(f"技能数量已达上限 {MAX_SKILLS_PER_USER}")
+        if conn.execute(
+            "SELECT 1 FROM user_skills WHERE user_id = ? AND slug = ?", (user_id, slug)
+        ).fetchone():
+            raise SkillValidationError(f"技能目录名 '{slug}' 已存在")
+        conn.execute(
+            "INSERT INTO user_skills "
+            "(skill_id, user_id, slug, name, description, body, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (skill_id, user_id, slug, name, description, body, now, now),
+        )
+    return get_user_skill(user_id, skill_id) or {}
+
+
+def update_user_skill(
+    user_id: str,
+    skill_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    body: str | None = None,
+) -> dict | None:
+    """改技能：只改传进来的字段。返回 None 表示这个技能不属于该用户。"""
+    init_db()
+    cur = get_user_skill(user_id, skill_id)
+    if cur is None:
+        return None
+
+    new_name = cur["name"] if name is None else name.strip()
+    new_desc = cur["description"] if description is None else (description or "").strip()
+    new_body = cur["body"] if body is None else (body or "")
+    _validate_skill_fields(cur["slug"], new_name, new_desc, new_body)
+
+    with _db() as conn:
+        conn.execute(
+            "UPDATE user_skills SET name = ?, description = ?, body = ?, updated_at = ? "
+            "WHERE user_id = ? AND skill_id = ?",
+            (new_name, new_desc, new_body, _now(), user_id, skill_id),
+        )
+    return get_user_skill(user_id, skill_id)
+
+
+def _remove_materialized_skill(user_id: str, slug: str) -> None:
+    """把某个技能在磁盘上的物化目录删掉（尽力而为，失败只记日志）。
+
+    正常路径下这活由 `materialize_user_skills()` 顺手做，但那只发生在装配团队时：
+    删完技能却还没提问的话，盘上会留一个孤儿目录。它不会被注册（技能清单来自库），
+    只是脏 —— 这里顺手清掉，省得看起来像"删不干净"。
+    """
+    safe_user, safe_slug = _safe_segment(user_id), _safe_segment(slug)
+    if safe_user is None or safe_slug is None:
+        return
+    skill_dir = USER_SKILLS_DIR / safe_user / safe_slug
+    try:
+        if skill_dir.is_dir():
+            shutil.rmtree(skill_dir, ignore_errors=True)
+    except OSError as e:
+        logger.warning("清理技能目录失败 %s/%s: %s", safe_user, safe_slug, e)
+
+
+def delete_user_skill(user_id: str, skill_id: str) -> bool:
+    """删技能。返回 False 表示这个技能不属于该用户（或不存在）。"""
+    init_db()
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT slug FROM user_skills WHERE user_id = ? AND skill_id = ?",
+            (user_id, skill_id),
+        ).fetchone()
+        if row is None:
+            return False
+        conn.execute(
+            "DELETE FROM user_skills WHERE user_id = ? AND skill_id = ?",
+            (user_id, skill_id),
+        )
+    _remove_materialized_skill(user_id, row[0])
+    return True
+
+
+def _render_skill_md(row: dict) -> str:
+    """生成 SKILL.md 正文。
+
+    `name` 必须等于 slug —— 清单里给模型的名字、它调 read_skill_file 时传的名字、
+    目录名，三者必须一致，否则工具查不到技能。
+
+    描述用 `json.dumps` 包成带引号的 YAML 标量：用户写的描述里一旦出现冒号或引号，
+    不加引号就会把 frontmatter 解坏。
+    """
+    desc = " ".join((row["description"] or "").split()) or f"用户技能 {row['slug']}"
+    return (
+        "---\n"
+        f"name: {json.dumps(row['slug'], ensure_ascii=False)}\n"
+        f"description: {json.dumps(desc, ensure_ascii=False)}\n"
+        "---\n\n"
+        f"{(row['body'] or '').strip()}\n"
+    )
+
+
+def materialize_user_skills(user_id: str) -> list[str]:
+    """把用户技能物化成磁盘目录，返回可直接交给 agentscope 的目录列表。
+
+    每次装配团队时调用：**内容不一致才写、库里已删的目录才清理** —— 所以是幂等的，
+    也不会因为并发装配互相删文件（同一用户的两个任务会同时装配）。
+
+    这里是「库是唯一事实来源、磁盘只是视图」的落点。deleted 技能如果不清盘，
+    它会继续被注册、继续生效 —— 那是删不掉的 bug。
+    """
+    init_db()
+    safe_user = _safe_segment(user_id)
+    if safe_user is None:
+        logger.warning("user_id 不合法，跳过技能物化: %r", user_id)
+        return []
+
+    root = USER_SKILLS_DIR / safe_user
+    root.mkdir(parents=True, exist_ok=True)
+
+    with _db() as conn:
+        rows = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT slug, name, description, body FROM user_skills "
+                "WHERE user_id = ? ORDER BY slug",
+                (user_id,),
+            ).fetchall()
+        ]
+
+    kept: dict[str, str] = {}
+    for row in rows:
+        slug = _safe_segment(row["slug"])
+        # 写入时已校验过，这里是第二道闸：宁可跳过也不越界
+        if slug is None or not _SLUG_RE.match(slug):
+            logger.warning("技能 slug 不合法，跳过: %r", row["slug"])
+            continue
+        content = _render_skill_md(row)
+        skill_dir = root / slug
+        skill_md = skill_dir / "SKILL.md"
+        try:
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            if not skill_md.is_file() or skill_md.read_text(encoding="utf-8") != content:
+                skill_md.write_text(content, encoding="utf-8")
+        except OSError as e:
+            logger.warning("技能写入失败，跳过 %s: %s", slug, e)
+            continue
+        kept[slug] = str(skill_dir)
+
+    try:
+        for child in root.iterdir():
+            if child.is_dir() and child.name not in kept:
+                shutil.rmtree(child, ignore_errors=True)
+    except OSError as e:
+        logger.warning("清理过期技能目录失败: %s", e)
+
+    return [kept[s] for s in sorted(kept)]
 
 
 # ── 用户与凭证 ──
