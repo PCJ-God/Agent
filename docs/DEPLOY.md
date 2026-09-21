@@ -84,21 +84,38 @@ cp .env.example .env          # 填 DASHSCOPE_API_KEY
 #   FORWARDED_ALLOW_IPS=127.0.0.1
 python scripts/run_server.py
 
-# 2) 装 Nginx 与 certbot
-sudo apt install nginx certbot python3-certbot-nginx
+# 2) 装 Nginx
+sudo apt install nginx
 sudo mkdir -p /var/www/certbot
-sudo cp deploy/nginx.conf /etc/nginx/conf.d/agent.conf
-sudo sed -i 's/agent.example.com/你的域名/g' /etc/nginx/conf.d/agent.conf
+
+# 拷贝两个文件 —— 主配置 + 共享片段。
+# 漏掉第二个，nginx 会因为 include 找不到文件而拒绝启动。
+sudo cp deploy/nginx.conf           /etc/nginx/conf.d/agent.conf
+sudo cp deploy/agent-locations.conf /etc/nginx/agent-locations.conf
+#    片段故意不放 conf.d/：nginx.conf 里有 include /etc/nginx/conf.d/*.conf
+#    （http 级包含），而 location 块只能出现在 server 块里。
+
+# 改域名：主配置里两处 server_name，以及两个 443 块各自的证书路径
+sudo vi /etc/nginx/conf.d/agent.conf
 sudo nginx -t && sudo systemctl reload nginx
 
-# 3) 签发证书（certbot 会自动改好 Nginx 里的证书路径）
-sudo certbot --nginx -d 你的域名
+# 3) 签证：用 webroot，与 nginx 里 /.well-known/acme-challenge/ 的 root 对应。
+#    不用 certbot --nginx 插件，免得它反过来改你的配置。
+sudo certbot certonly --webroot -w /var/www/certbot \
+  -d 你的域名 -d www.你的域名
 
-# 4) 确认自动续期已生效
-systemctl list-timers | grep certbot
+# 4) 确认自动续期。本项目的做法是 cron（见 deploy/setup-nginx-cert.sh），
+#    不是 certbot 包的 systemd timer：
+cat /etc/cron.d/certbot-renew
 ```
 
-`deploy/nginx.conf` 里有三处必须按你的环境改：`server_name`、证书路径、`proxy_pass`。
+`deploy/nginx.conf` 里要按你的环境改的是：两个 `server_name`、两个 443 块里的
+证书路径；`proxy_pass` 与超时、SSE 关缓冲等转发参数在 `deploy/agent-locations.conf` 里。
+
+**为什么是两个 443 server 块**：nginx 按 `server_name`（SNI）选 server 块，证书随块走。
+在同一个块里写多个 `ssl_certificate` 并不能实现「按 SNI 选证书」——那个写法是给
+同一域名同时配 RSA 和 ECDSA 用的。实测把两张证书塞进一个块，域名访问会拿到 IP 证书，
+浏览器报名称不匹配。要同时支持域名和纯 IP，就各占一个块。
 
 ## 方案 A2：Caddy（配置最少）
 
