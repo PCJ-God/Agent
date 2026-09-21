@@ -1,0 +1,37 @@
+=== install systemd unit ===
+Created symlink '/etc/systemd/system/multi-user.target.wants/agent.service' 鈫?'/etc/systemd/system/agent.service'.
+=== unit file (check paths) ===
+User=agent
+Group=agent
+WorkingDirectory=/opt/agent
+ExecStart=/opt/agent/.venv/bin/python scripts/run_server.py
+Restart=always
+RestartSec=5
+=== enabled / active ? ===
+enabled: enabled
+active : active
+=== wait for /health via the service (max 40s) ===
+healthy after ~2s: {"status":"ok","mcp":"initializing","sessions":0}
+=== systemctl status (head) ===
+鈼?agent.service - Agent 鏅鸿兘鏁欏鍔╂墜锛團astAPI + 灞傜骇鍗忎綔锛?     Loaded: loaded (/etc/systemd/system/agent.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-09-21 14:09:40 CST; 5s ago
+ Invocation: 438ec672e2af4761ae6487b82cb4d4d4
+       Docs: file:///opt/agent/docs/DEPLOY.md
+   Main PID: 48348 (python)
+      Tasks: 3 (limit: 1552)
+     Memory: 146.2M (peak: 146.4M)
+        CPU: 2.159s
+     CGroup: /system.slice/agent.service
+             鈹斺攢48348 /opt/agent/.venv/bin/python scripts/run_server.py
+
+=== journal tail ===
+Sep 21 14:09:40 VM-0-3-ubuntu systemd[1]: /etc/systemd/system/agent.service:37: Unknown key 'StartLimitIntervalSec' in section [Service], ignoring.
+Sep 21 14:09:40 VM-0-3-ubuntu systemd[1]: Started agent.service - Agent 鏅鸿兘鏁欏鍔╂墜锛團astAPI + 灞傜骇鍗忎綔锛?
+Sep 21 14:09:42 VM-0-3-ubuntu agent[48348]: 14:09:42 | INFO    | src.access.server - HTTP 鐩戝惉 127.0.0.1:8000锛圱LS 浜ょ粰鍙嶅悜浠ｇ悊锛?Sep 21 14:09:42 VM-0-3-ubuntu agent[48348]: INFO:     Started server process [48348]
+Sep 21 14:09:42 VM-0-3-ubuntu agent[48348]: INFO:     Waiting for application startup.
+Sep 21 14:09:42 VM-0-3-ubuntu agent[48348]: INFO:     Application startup complete.
+Sep 21 14:09:42 VM-0-3-ubuntu agent[48348]: INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+Sep 21 14:09:45 VM-0-3-ubuntu agent[48348]: INFO:     127.0.0.1:44120 - "GET /health HTTP/1.1" 200 OK
+=== will it come back after reboot? ===
+enabled
+=== DONE ===

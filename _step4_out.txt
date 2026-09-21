@@ -1,0 +1,27 @@
+=== retry git pull (GitHub is intermittent from this host; non-fatal) ===
+Terminated                 sudo -u agent git -C /opt/agent pull --ff-only 2>&1
+pull FAILED again -- staying at d762522
+(this only means the repo lacks constraints.txt; the install already used /tmp/constraints.txt)
+=== .env ===
+created /opt/agent/.env from .env.example
+--- effective settings (API key value masked) ---
+DASHSCOPE_API_KEY=<value hidden>
+LLM_MODEL=qwen-plus
+ENABLE_LONG_TERM_MEMORY=true
+LTM_SCOPE=session
+QDRANT_URL=
+MAX_SESSIONS_PER_USER=50
+MAX_TEAMS=20
+RATE_LIMIT_PER_MINUTE=20
+HOST=127.0.0.1
+PORT=8000
+FORWARDED_ALLOW_IPS=127.0.0.1
+=== skills on server ===
+skills/course-review/SKILL.md
+=== auth / session files present? ===
+OK   src/access/auth.py
+OK   src/storage/memory/session_store.py
+OK   deploy/agent.service
+=== is anything already listening on 8000? ===
+port 8000 free
+=== DONE ===

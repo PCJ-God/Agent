@@ -1,0 +1,37 @@
+=== 8a) is the unit warning actually gone since the restart? ===
+active since: Mon 2026-09-21 14:11:08 CST
+unknown-key warnings since restart: 1   (0 = genuinely clean)
+
+=== 8b) install the real HTTPS nginx config (repo copy still says agent.example.com) ===
+--- server_name / cert paths after substitution ---
+6:# 鏀硅繖涓夊锛歴erver_name銆佽瘉涔﹁矾寰勩€佷互鍙婏紙濡傛灉闇€瑕侊級proxy_pass 鐨勫湴鍧€銆?16:    server_name 139.155.146.41;
+32:    server_name 139.155.146.41;
+34:    ssl_certificate     /etc/letsencrypt/live/139.155.146.41/fullchain.pem;
+35:    ssl_certificate_key /etc/letsencrypt/live/139.155.146.41/privkey.pem;
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+reload rc=0
+
+=== 8c) local probes through nginx ===
+https /health        -> 200
+http  /health        -> 200  (expect 301)
+https /api/sessions  -> 401  (expect 401)
+
+=== 8d) inspect the certificate actually served on 443 ===
+subject=
+issuer=C=US, O=Let's Encrypt, CN=YE1
+notBefore=Sep 21 05:13:04 2026 GMT
+notAfter=Sep 27 21:13:03 2026 GMT
+
+=== 8e) renewal must work: a 6-day cert that fails to renew = HTTPS dies in 6 days ===
+139.155.146.41.conf
+--- installed cron ---
+0 3,15 * * * root /opt/certbot/bin/certbot renew --quiet --deploy-hook "systemctl reload nginx"
+--- dry-run renewal (real validation against LE staging) ---
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Done                       sudo /opt/certbot/bin/certbot renew --dry-run 2>&1 | tail -14
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Processing /etc/letsencrypt/renewal/139.155.146.41.conf
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+=== DONE ===

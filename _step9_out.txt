@@ -1,0 +1,57 @@
+=== is a certbot run still going? ===
+49941 sudo /opt/certbot/bin/certbot renew --dry-run
+49944 /opt/certbot/bin/python3 /opt/certbot/bin/certbot renew --dry-run
+
+=== why does http:// return 200 instead of 301? ===
+--- full response headers for http://127.0.0.1/health ---
+HTTP/1.1 301 Moved Permanently
+Server: nginx/1.28.3 (Ubuntu)
+Date: Mon, 21 Sep 2026 06:15:17 GMT
+Content-Type: text/html
+Content-Length: 178
+Connection: keep-alive
+Location: https://127.0.0.1/health
+
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body>
+<center><h1>301 Moved Permanently</h1></center>
+--- same request but with an explicit Host header ---
+  Host: 139.155.146.41              -> 301
+  Host: something.else   -> 301
+--- nginx config inventory ---
+/etc/nginx/conf.d/:
+total 12
+drwxr-xr-x 2 root root 4096 Sep 21 14:11 .
+drwxr-xr-x 8 root root 4096 Sep 21 13:21 ..
+-rw-r--r-- 1 root root 2806 Sep 21 14:13 agent.conf
+
+/etc/nginx/sites-enabled/:
+total 8
+drwxr-xr-x 2 root root 4096 Sep 21 14:11 .
+drwxr-xr-x 8 root root 4096 Sep 21 13:21 ..
+
+=== certificate SAN (the IP must be in subjectAltName) ===
+subject=
+notBefore=Sep 21 05:13:04 2026 GMT
+notAfter=Sep 27 21:13:03 2026 GMT
+X509v3 Subject Alternative Name: critical
+    IP Address:139.155.146.41
+
+=== unit warnings since the LAST restart only ===
+active since: Mon 2026-09-21 14:11:08 CST
+  none -> unit file is clean now
+
+=== letsencrypt log tail (dry-run outcome) ===
+2026-09-21 14:13:16,689:DEBUG:certbot._internal.main:certbot version: 5.8.0
+2026-09-21 14:13:16,689:DEBUG:certbot._internal.main:Location of certbot entry point: /opt/certbot/bin/certbot
+2026-09-21 14:13:16,689:DEBUG:certbot._internal.main:Arguments: ['--dry-run']
+2026-09-21 14:13:16,689:DEBUG:certbot._internal.main:Discovered plugins: PluginsRegistry(PluginEntryPoint#manual,PluginEntryPoint#null,PluginEntryPoint#standalone,PluginEntryPoint#webroot)
+2026-09-21 14:13:16,697:DEBUG:certbot._internal.log:Root logging level set at 30
+2026-09-21 14:13:16,698:DEBUG:certbot._internal.display.obj:Notifying user: Processing /etc/letsencrypt/renewal/139.155.146.41.conf
+2026-09-21 14:13:16,699:DEBUG:certbot.configuration:Var server=https://acme-staging-v02.api.letsencrypt.org/directory (set by user).
+2026-09-21 14:13:16,699:DEBUG:certbot.configuration:Var account=None (set by user).
+2026-09-21 14:13:16,699:DEBUG:certbot._internal.plugins.selection:Requested authenticator None and installer None
+2026-09-21 14:13:16,703:INFO:certbot._internal.renewal:Certificate not due for renewal, but simulating renewal for dry run
+2026-09-21 14:13:16,703:INFO:certbot._internal.renewal:Non-interactive renewal: random delay of 456.5765114819075 seconds
+=== DONE ===

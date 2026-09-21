@@ -1,0 +1,27 @@
+=== frontend 鐩綍鍐呭 ===
+total 36
+drwxr-xr-x  2 agent agent  4096 Sep 21 13:22 .
+drwxr-xr-x 11 agent agent  4096 Sep 21 14:07 ..
+-rw-r--r--  1 agent agent 24853 Sep 21 13:22 index.html
+
+=== index.html 閲屾墍鏈?src/href 寮曠敤 ===
+href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"
+src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"
+
+=== 鏄惁纭紪鐮佷簡 API 鍦板潃锛堝叧閿細鍐欐 127.0.0.1 鐨勮瘽锛岃蛋 nginx 鐨勬祻瑙堝櫒浼氳皟宕╋級===
+  锛堟病鏈夌‖缂栫爜鐨?127.0.0.1 / localhost / :8000锛?
+=== 椤甸潰鏄€庝箞璋冨悗绔殑锛坒etch/EventSource 鐨勭敤娉曪級===
+360:    const res = await fetch('/api/auth/register', {
+379:    let res = await fetch(path, o);
+383:      res = await fetch(path, o);
+751:        const r = await fetch('/api/auth/me', {
+
+=== /static/ 杩欎釜鎸傝浇鐐瑰埌搴曟湁娌℃湁涓滆タ ===
+  GET /static/          -> 404
+  GET /static/index.html -> 200
+=== 搴旂敤鏄惁鎶婂叾瀹冭矾寰勪篃浜ょ粰 nginx 涔嬪鐨勪笢瑗?===
+  GET /app.js  -> 404
+=== DONE ===

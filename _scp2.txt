@@ -1,0 +1,3 @@
+--- skills now ---
+skills/course-review/SKILL.md
+skills/frontend-design/SKILL.md

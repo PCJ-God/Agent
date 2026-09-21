@@ -1,0 +1,50 @@
+public IP (from Tencent metadata): 139.155.146.41
+
+=== 0) reinstall corrected systemd unit (StartLimit* moved to [Unit]) ===
+unit warnings in journal: 1  (0 = clean)
+service active: active
+
+=== 1) install nginx ===
+E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 49081 (unattended-upgr)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?
+nginx version: nginx/1.28.3 (Ubuntu)
+
+=== 2) HTTP-only config (needed before ACME can validate) ===
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+local probe http://127.0.0.1/ -> 200
+
+=== 3) certbot via pip (not snap: snapcraft is unreliable from mainland) ===
+E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 49081 (unattended-upgr)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?
+certbot 5.8.0
+
+=== 4) issue IP certificate (needs certbot >= 5.4 for webroot+IP) ===
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Account registered.
+Requesting a certificate for 139.155.146.41
+
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/139.155.146.41/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/139.155.146.41/privkey.pem
+This certificate expires on 2026-09-27.
+These files will be updated when the certificate renews.
+NEXT STEPS:
+- The certificate will need to be renewed before it expires. Certbot can automatically renew the certificate in the background, but you may need to take steps to enable that functionality. See https://certbot.org/renewal-setup for instructions.
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+If you like Certbot, please consider supporting our work by:
+ * Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+ * Donating to EFF:                    https://eff.org/donate-le
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+=== 5) what is on disk ===
+139.155.146.41
+README
+total 4
+-rw-r--r-- 1 root root 692 Sep 21 14:11 README
+lrwxrwxrwx 1 root root  38 Sep 21 14:11 cert.pem -> ../../archive/139.155.146.41/cert1.pem
+lrwxrwxrwx 1 root root  39 Sep 21 14:11 chain.pem -> ../../archive/139.155.146.41/chain1.pem
+lrwxrwxrwx 1 root root  43 Sep 21 14:11 fullchain.pem -> ../../archive/139.155.146.41/fullchain1.pem
+lrwxrwxrwx 1 root root  41 Sep 21 14:11 privkey.pem -> ../../archive/139.155.146.41/privkey1.pem
+=== DONE ===

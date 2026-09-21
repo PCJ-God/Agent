@@ -1,0 +1,13 @@
+--- listening 80/443 ---
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=49924,fd=5),("nginx",pid=49923,fd=5),("nginx",pid=35535,fd=5))   
+LISTEN 0      2048       127.0.0.1:8000      0.0.0.0:*    users:(("python",pid=48988,fd=7))                                                    
+LISTEN 0      511          0.0.0.0:443       0.0.0.0:*    users:(("nginx",pid=49924,fd=9),("nginx",pid=49923,fd=9),("nginx",pid=35535,fd=9))   
+LISTEN 0      511             [::]:80           [::]:*    users:(("nginx",pid=49924,fd=6),("nginx",pid=49923,fd=6),("nginx",pid=35535,fd=6))   
+LISTEN 0      511             [::]:443          [::]:*    users:(("nginx",pid=49924,fd=10),("nginx",pid=49923,fd=10),("nginx",pid=35535,fd=10))
+--- ufw ---
+Status: inactive
+--- iptables INPUT ---
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+--- local 443 works? ---
+local https -> 000

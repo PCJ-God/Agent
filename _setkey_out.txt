@@ -1,0 +1,9 @@
+=== write key into /opt/agent/.env ===
+DASHSCOPE_API_KEY lines : 1
+value length (chars)    : 115
+value prefix            : sk-ws-
+other settings intact   : 4/4
+=== live auth check: real request to DashScope ===
+HTTP status: 200
+RESULT: KEY IS VALID (DashScope accepted it)
+=== done ===

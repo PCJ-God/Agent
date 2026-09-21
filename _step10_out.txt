@@ -1,0 +1,37 @@
+=== kill the randomly-delayed dry-run (certbot sleeps ~7.6min by design) ===
+  no certbot process now
+
+=== re-run dry-run without the random sleep: does renewal actually work? ===
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Processing /etc/letsencrypt/renewal/139.155.146.41.conf
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Account registered.
+Simulating renewal of an existing certificate for 139.155.146.41
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Congratulations, all simulated renewals succeeded: 
+  /etc/letsencrypt/live/139.155.146.41/fullchain.pem (success)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+=== renewal config (records webroot + deploy hook path) ===
+version = 5.8.0
+archive_dir = /etc/letsencrypt/archive/139.155.146.41
+cert = /etc/letsencrypt/live/139.155.146.41/cert.pem
+privkey = /etc/letsencrypt/live/139.155.146.41/privkey.pem
+chain = /etc/letsencrypt/live/139.155.146.41/chain.pem
+fullchain = /etc/letsencrypt/live/139.155.146.41/fullchain.pem
+[renewalparams]
+account = 6b72db7c9197ff8b41d4f94c59fd5e09
+preferred_profile = shortlived
+authenticator = webroot
+webroot_path = /var/www/certbot,
+server = https://acme-v02.api.letsencrypt.org/directory
+key_type = ecdsa
+[[webroot_map]]
+139.155.146.41 = /var/www/certbot
+
+=== cron entry ===
+0 3,15 * * * root /opt/certbot/bin/certbot renew --quiet --deploy-hook "systemctl reload nginx"
+=== DONE ===

@@ -1,0 +1,12 @@
+LOGIN_OK
+VM-0-3-ubuntu
+ubuntu
+PRETTY_NAME="Ubuntu 26.04 LTS"
+Python 3.14.4
+2
+               total        used        free      shared  buff/cache   available
+Mem:            1962         442         579           2        1110        1519
+Swap:           2047           0        2047
+/dev/vda3        39G  5.7G   32G  16% /
+git version 2.53.0
+SUDO_NOPASSWD_OK
