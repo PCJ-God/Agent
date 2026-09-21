@@ -17,6 +17,12 @@ Documentation=file:///opt/agent/docs/DEPLOY.md
 After=network-online.target
 Wants=network-online.target
 
+# 连续快速失败就放弃，避免无限重启刷爆日志。
+# 注意：这两个键属于 [Unit] 段。放在 [Service] 里 systemd 会报
+# "Unknown key ... ignoring" 然后默默忽略 —— 而你会以为防重启风暴生效了。
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
 [Service]
 Type=simple
 User=agent
@@ -32,9 +38,6 @@ ExecStart=/opt/agent/.venv/bin/python scripts/run_server.py
 # 崩了自动拉起
 Restart=always
 RestartSec=5
-# 连续快速失败就放弃，避免无限重启刷爆日志
-StartLimitBurst=5
-StartLimitIntervalSec=120
 
 StandardOutput=journal
 StandardError=journal
