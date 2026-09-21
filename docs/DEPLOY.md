@@ -13,6 +13,57 @@
 
 ---
 
+## 第 0 步：决定暴露方式（这决定要不要备案）
+
+服务器在**大陆**时，**域名指向 80/443 必须完成 ICP 备案**，否则会被阻断。但有两条路可以立刻上线：
+
+| 方式 | 备案 | 证书 | 适合 |
+|------|------|------|------|
+| **纯 IP + IP 证书** | 不需要 | Let's Encrypt IP 证书（有效期仅约 6 天，**必须自动续期**） | 立刻可用、自己或小范围使用 |
+| **域名 + 普通证书** | 需要（1–3 周） | Let's Encrypt / 云厂商免费证书 | 对外提供、要一个能记住的地址 |
+
+### 路线一：纯 IP + Let's Encrypt IP 证书（推荐先用这条）
+
+Let's Encrypt 自 **2026-01** 起正式为**纯 IP**签发证书（与 6 天短有效期同时转 GA），
+IPv4 / IPv6 都支持。这意味着**不需要域名、不需要备案**就能拿到浏览器信任的 HTTPS。
+
+```bash
+# 先确认能从这台机器连上 ACME 端点（大陆机房有时不稳）
+curl -I https://acme-v02.api.letsencrypt.org/directory
+
+sudo apt install -y certbot          # 需要 certbot >= 5.3（--ip-address 是新加的）
+sudo mkdir -p /var/www/html
+sudo certbot certonly \
+  --preferred-profile shortlived \
+  --webroot --webroot-path /var/www/html \
+  --ip-address <你的公网 IP>
+```
+
+证书落在 `/etc/letsencrypt/live/<你的公网 IP>/`。**certbot 目前还不能自动把 IP 证书装进
+nginx**，要在 `deploy/nginx.conf` 里手动指定：
+
+```nginx
+ssl_certificate     /etc/letsencrypt/live/<你的公网 IP>/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/<你的公网 IP>/privkey.pem;
+server_name         <你的公网 IP>;
+```
+
+三个必须知道的点：
+
+- **有效期只有约 6 天，所以续期不是可选项，是运行前提。** 用 certbot 自带的 timer
+  （`systemctl list-timers | grep certbot`）。
+- **不要手动反复重签。** Let's Encrypt 对同一组标识符有「每周 5 张重复证书」的限制，
+  手动猛签会把自己锁进限流里。
+- IP 证书只解决 HTTPS：`server_name` 要写 IP，HTTP→HTTPS 的 301 也要指向 IP。
+
+### 路线二：域名 + 备案
+
+要一个能记住的地址、要对外提供，就走这条：买域名 → 在云厂商控制台提交备案（1–3 周）→
+域名解析到本机 → `sudo certbot --nginx -d 你的域名`。
+审核期间可以先用路线一跑起来，两条路不冲突。
+
+---
+
 ## 方案 A1：Nginx + certbot
 
 ```bash
