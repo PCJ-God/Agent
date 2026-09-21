@@ -9,6 +9,11 @@ from agentscope.mcp import HttpStatelessClient
 from agentscope.tool import Toolkit
 
 from src.config import DASHSCOPE_API_KEY, MCP_SERVER_URL, SKILLS_DIR
+from src.execution.tools.skill_files import (
+    SKILL_INSTRUCTION,
+    SKILL_TEMPLATE,
+    make_skill_reader,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,15 +136,28 @@ class ToolPool:
     def new_toolkit(self) -> Toolkit:
         """从池里复制出一份新的 Toolkit，交给一个 Agent 独占使用。
 
+        除了池里的 MCP 工具与 Skill，还挂一个**受限的技能读取器**：技能清单里
+        只给名字和描述，正文要靠它按需去取（原因见 `skill_files` 模块头部）。
+        框架默认的技能模板只说 `Check "{dir}/SKILL.md"` —— 既没点名工具（Agent
+        手上没有读文件的工具，技能就一直空转），又把服务器绝对路径交给了远程
+        LLM，所以这里用 SKILL_TEMPLATE / SKILL_INSTRUCTION 覆盖掉。
+
         Returns:
-            装配好池内全部 MCP 工具与 Skill 的新 Toolkit
+            装配好池内全部 MCP 工具、Skill 与技能读取器的新 Toolkit
         """
-        toolkit = Toolkit()
+        toolkit = Toolkit(
+            agent_skill_instruction=SKILL_INSTRUCTION,
+            agent_skill_template=SKILL_TEMPLATE,
+        )
 
         for func in self._mcp_functions:
             toolkit.register_tool_function(func)
 
         for skill_dir in self.skill_dirs:
             toolkit.register_agent_skill(skill_dir)
+
+        # 一个技能都没有时不挂：挂一个必然回「没有这个技能」的工具没有意义
+        if self.skill_dirs:
+            toolkit.register_tool_function(make_skill_reader(self.skill_dirs))
 
         return toolkit

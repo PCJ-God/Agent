@@ -278,6 +278,35 @@ Unknown key 'StartLimitIntervalSec' in section [Service], ignoring
 它必须声明在 `renderFooter()` **首次调用之前**，否则就是 3.10 那个 TDZ 崩溃的翻版。
 已在声明处写明原因（4.10 的三层检查会拦住这类回归）。
 
+### 3.14 技能从「空转」变成真的被读到
+
+**发现**：agentscope 只把技能的 `name` / `description` / **目录**拼进提示词
+（`_toolkit.py:148-150`：`Check "{dir}/SKILL.md" for how to use this skill`），
+**正文不进提示词**；而 Agent 手上只有 `bailian_web_search` 一个工具（服务日志里
+`工具池就绪` 那行可查）。所以 `skills/` 下那两个技能一直只是占位说明，对行为没有
+影响 —— 要支持「用户自己添加技能」，必须先修这个，否则前端只是个好看的壳。
+
+| 文件 | 内容 |
+|------|------|
+| `src/execution/tools/skill_files.py` | 新增：受限的技能文件读取器 |
+| `src/execution/tools/tool_manager.py` | `new_toolkit()` 注册读取器 + 覆盖框架默认技能模板 |
+| `scripts/check_skill_reader.py` | 新增：安全回归测试（23 项） |
+
+**为什么不用框架自带的 `view_text_file`**：它只做一次 `os.path.expanduser()` 就
+`open()`（`_text_file/_view_text_file.py:29-50`），**没有任何路径限制**。在「用户可以
+自己写技能正文」的场景下，一句正文就能命令 Agent 去读 `.env` 里的 DashScope key。
+
+**读取器的边界**：对外只暴露**技能名**，不暴露服务器路径（路径解析全在服务端，
+「路径穿越」这个概念根本传不到模型那边）；**先 `resolve()` 再校验前缀**，所以 `..`
+和指向外部的软链接都绕不出去；另有绝对路径 / 目录 / 大小上限（200 KB）的拒绝；
+被拒时返回**文本错误而不是抛异常**，模型能看懂并自己纠正。
+
+**顺手去掉一处泄露**：框架默认模板会把 `/opt/agent/skills/...` 这个服务器绝对路径
+交给远程 LLM，现在换成只提技能名 + 工具名。
+
+**下一步（尚未做）**：用户自建技能（v3 迁移 + 存储 + API）、前端侧栏改真导航 + 抽屉、
+MCP 只开远程 URL 档（含 SSRF 防护）。
+
 ---
 
 ## 四、验证记录
@@ -470,6 +499,33 @@ tokens=34   孤儿token=0   integrity_check: ok
 
 **线上前端一致性**：本地 / 服务器上的文件 / HTTPS 实际返回，三份 md5 相同
 （`be543ab4d9e0b06768c170057250026c`）—— 浏览器收到的就是本地测过的那一份。
+
+### 4.12 技能读取器（23 项安全测试 + 活体验证）
+
+```text
+scripts/check_skill_reader.py  ->  23 项全过
+  能读 SKILL.md / ranges / 负数 ranges / 技能名大小写不敏感        ✓
+  技能子目录里的资料文件可读                                     ✓
+  拒绝 ../../.env、../../../../etc/passwd、/etc/passwd、
+       C:\Windows\win.ini、指向 .env 的软链接、把目录当文件、300KB 大文件  ✓
+  被拒时返回文本错误而非抛异常，且不泄露 .env 内容                  ✓
+  先证明 /opt/agent/.env 确实存在（否则这组测试是空的）             ✓
+```
+
+部署顺序也刻意做成「**先跑测试、通过了才重启**」：测试失败时脚本中止在重启之前，
+线上仍跑旧代码，不会把没验过的东西推上去。
+
+活体验证（真实对话，不是模拟）：
+
+```text
+日志 : "name": "read_skill_file",
+       "raw_input": "{\"skill_name\": \"frontend-design\"}"
+回答 : The three things that must be determined before designing are:
+       1. The concrete subject, 2. The audience, and 3. ...
+```
+
+回答里这三项正是 `frontend-design/SKILL.md` 正文的原话 —— 技能从「空转」变成真的
+被读、真的影响输出；期间 0 条越权告警。
 
 ---
 
