@@ -1,0 +1,122 @@
+
+==================== 1. 浠ｇ爜鏄惁鐪熺殑鍦ㄧ鐩樹笂 ====================
+total 76
+drwxr-xr-x 11 agent agent 4096 Sep 21 14:07 .
+drwxr-xr-x  4 root  root  4096 Sep 21 14:52 ..
+-rw-------  1 agent agent 1669 Sep 21 14:07 .env
+-rw-r--r--  1 agent agent 1589 Sep 21 13:22 .env.example
+drwxr-xr-x  7 agent agent 4096 Sep 21 13:50 .git
+-rw-r--r--  1 agent agent  620 Sep 21 13:48 .gitattributes
+-rw-r--r--  1 agent agent  661 Sep 21 13:22 .gitignore
+drwxr-xr-x  5 agent agent 4096 Sep 21 13:48 .venv
+-rw-r--r--  1 agent agent  987 Sep 21 13:22 QWEN.md
+-rw-r--r--  1 agent agent 7035 Sep 21 13:22 README.md
+drwxr-xr-x  2 agent agent 4096 Sep 21 14:08 data
+drwxr-xr-x  2 agent agent 4096 Sep 21 13:48 deploy
+drwxr-xr-x  2 agent agent 4096 Sep 21 13:22 docs
+drwxr-xr-x  2 agent agent 4096 Sep 21 13:22 frontend
+-rw-r--r--  1 agent agent  904 Sep 21 13:22 requirements.txt
+drwxr-xr-x  2 agent agent 4096 Sep 21 13:22 scripts
+drwxr-xr-x  4 agent agent 4096 Sep 21 13:57 skills
+--- 鍏抽敭鏂囦欢锛堝ぇ灏忎笉涓?0 鎵嶇畻鐪熷湪锛?---
+  OK   src/access/auth.py                             1766 bytes
+  OK   src/access/server.py                          14241 bytes
+  MISS src/access/ratelimit.py                   
+  OK   src/storage/memory/session_store.py           11447 bytes
+  OK   src/orchestration/hierarchical.py             11012 bytes
+  OK   scripts/run_server.py                           361 bytes
+  OK   frontend/index.html                           24853 bytes
+  OK   requirements.txt                                904 bytes
+  MISS constraints.txt                           
+  OK   deploy/agent.service                           1604 bytes
+  OK   deploy/nginx.conf                              2818 bytes
+  OK   docs/DEPLOY.md                                12363 bytes
+
+==================== 2. Python 鐜涓庡寘鐗堟湰 ====================
+Python 3.14.4
+  agentscope                               1.0.18
+  dashscope                                1.27.6
+  fastapi                                  0.136.3
+  mcp                                      1.29.0
+  mem0ai                                   1.0.11
+  openai                                   2.45.0
+  pydantic                                 2.12.3
+  qdrant-client                            1.19.0
+  uvicorn                                  0.49.0
+
+==================== 3. .env锛坘ey 宸叉墦鐮侊紝姘歌繙涓嶈璐村師鏂囷級 ====================
+-rw------- 1 agent agent 1669 Sep 21 14:07 /opt/agent/.env
+  DASHSCOPE_API_KEY=***masked***
+  LLM_MODEL=qwen-plus
+  LTM_SCOPE=session
+  HOST=127.0.0.1
+  PORT=8000
+  FORWARDED_ALLOW_IPS=127.0.0.1
+
+==================== 4. systemd 鏈嶅姟 ====================
+  is-active : active
+  is-enabled: enabled
+  started   : Mon 2026-09-21 14:11:08 CST
+  鈼?agent.service - Agent API (FastAPI + hierarchical collaboration)
+       Loaded: loaded (/etc/systemd/system/agent.service; enabled; preset: enabled)
+       Active: active (running) since Mon 2026-09-21 14:11:08 CST; 41min ago
+   Invocation: 461ed06d95ef4e0994df92eacd42d70d
+         Docs: file:///opt/agent/docs/DEPLOY.md
+     Main PID: 48988 (python)
+
+==================== 5. 搴旂敤鐪熷疄鍝嶅簲锛堥噸鐐癸細鏍硅矾寰勮繑鍥炵殑鏄笉鏄湡 HTML锛?====================
+--- GET /health ---
+{"status":"ok","mcp":"initializing","sessions":0}
+--- GET /  鐨?Content-Type 涓庡瓧鑺傛暟 ---
+  content-type=text/html; charset=utf-8  bytes=24853
+--- GET /  鍓?14 琛?---
+  | <!DOCTYPE html>
+  | <html lang="zh-CN">
+  | <head>
+  | <meta charset="UTF-8">
+  | <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  | <title>Agent 鏅鸿兘浣撶郴缁?鈥?Hierarchical</title>
+  | <!-- 鏁板鍏紡鏍峰紡 (KaTeX)锛屾覆鏌撹剼鏈湪椤甸潰搴曢儴寮曞叆 -->
+  | <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  | <style>
+  |   :root {
+  |     --bg: #0c0c14;
+  |     --surface: #14141f;
+  |     --surface-hover: #1c1c2a;
+  |     --border: #2a2a3a;
+--- 椤甸潰涓婂紩鐢ㄧ殑闈欐€佽祫婧愭槸鍚︾湡鑳藉彇鍒?---
+
+==================== 6. 璁よ瘉灞傛槸鍚︾湡鐨勫湪鎷︿汉 ====================
+  鏃?token   /api/sessions -> 401  (401 = 鍦ㄦ嫤)
+  娉ㄥ唽       /api/auth/register -> 200
+  鎷垮埌鐨?token 闀垮害: 32
+  甯?token   /api/auth/me -> 200  (200 = token 鏈夋晥)
+
+==================== 7. 绔彛鏆撮湶闈紙鍏抽敭锛?000 鍙兘鍑虹幇鍦?127.0.0.1锛屼笉鑳芥槸 0.0.0.0锛?====================
+  0.0.0.0:80   users:(("nginx",pid=49924,fd=5),("nginx",pid=49923,fd=5),("nginx",pid=35535,fd=5))
+  127.0.0.1:8000   users:(("python",pid=48988,fd=7))
+  0.0.0.0:443   users:(("nginx",pid=49924,fd=9),("nginx",pid=49923,fd=9),("nginx",pid=35535,fd=9))
+  [::]:80   users:(("nginx",pid=49924,fd=6),("nginx",pid=49923,fd=6),("nginx",pid=35535,fd=6))
+  [::]:443   users:(("nginx",pid=49924,fd=10),("nginx",pid=49923,fd=10),("nginx",pid=35535,fd=10))
+
+==================== 8. nginx 涓庤瘉涔?====================
+  nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+  nginx: configuration file /etc/nginx/nginx.conf test is successful
+  server_name: #鏀硅繖涓夊锛歴erver_name銆佽瘉涔﹁矾寰勩€佷互鍙婏紙濡傛灉闇€瑕侊級proxy_pass鐨勫湴鍧€銆?  subject=
+  notBefore=Sep 21 05:13:04 2026 GMT
+  notAfter=Sep 27 21:13:03 2026 GMT
+  X509v3 Subject Alternative Name: critical
+      IP Address:139.155.146.41
+  --- 鏈湴璧?nginx 鐨勮闂?---
+  https 127.0.0.1/health -> 200
+  http  127.0.0.1/health -> 301  (301 = 璺宠浆姝ｅ父)
+
+==================== 9. 缁湡 ====================
+  0 3,15 * * * root /opt/certbot/bin/certbot renew --quiet --deploy-hook "systemctl reload nginx"
+
+==================== 10. 纾佺洏涓庡唴瀛?====================
+  /dev/vda3        39G  6.1G   31G  17% /
+                 total        used        free      shared  buff/cache   available
+  Mem:            1962         663         270           4        1222        1299
+
+==================== 鑷煡缁撴潫 ====================

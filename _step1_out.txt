@@ -1,0 +1,50 @@
+=== 0) python3-venv available? ===
+Python 3.14.4
+=== 1) service account ===
+user 'agent' already exists
+=== 2) clone branch multi-agent ===
+already a git repo -> git pull
+From https://github.com/PCJ-God/Agent
+   9fcbc2b..d762522  multi-agent -> origin/multi-agent
+Updating 9fcbc2b..d762522
+Fast-forward
+ .gitattributes          |  15 ++++++
+ deploy/bootstrap-app.sh | 123 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 138 insertions(+)
+ create mode 100644 .gitattributes
+ create mode 100644 deploy/bootstrap-app.sh
+--- repo contents ---
+QWEN.md
+README.md
+data
+deploy
+docs
+frontend
+requirements.txt
+scripts
+skills
+src
+--- sanity ---
+run_server.py OK
+agent.service OK
+=== 3) venv ===
+Python 3.14.4
+pip 26.2.1 from /opt/agent/.venv/lib/python3.14/site-packages/pip (python 3.14)
+=== 4) dependency resolution probe (no install) ===
+DRY-RUN OK
+--- versions that WOULD be installed (key packages) ---
+agentscope==2.0.8
+aiohttp==3.14.3
+dashscope==1.27.6
+fastapi==0.141.1
+grpcio==1.84.0
+mem0ai==2.1.0
+numpy==2.5.3
+openai==3.16.2
+pydantic==2.13.5
+qdrant-client==1.19.1
+uvicorn==0.53.0
+total packages: 111
+=== 5) would anything need building from source? ===
+(none reported)
+=== done ===

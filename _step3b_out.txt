@@ -1,0 +1,24 @@
+constraints ready (13 pinned entries)
+=== INSTALL start: 13:54:27 ===
+    109 packages via Tencent mirror; full log -> /tmp/pip-install.log
+=== INSTALL done: 13:55:07 ===
+--- pip log tail ---
+  Using cached wsproto-1.3.2-py3-none-any.whl (24 kB)
+Collecting regex (from tiktoken->agentscope>=0.1.0->-r /opt/agent/requirements.txt (line 4))
+  Using cached regex-2026.9.10-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (803 kB)
+Installing collected packages: pytz, filetype, websocket-client, urllib3, typing-extensions, truststore, tqdm, sniffio, shortuuid, shellingham, rpds-py, regex, pyyaml, python-multipart, python-dotenv, pyjwt, pygments, pycparser, protobuf, propcache, portalocker, pluggy, packaging, numpy, multidict, mdurl, loguru, json5, json_repair, jiter, iniconfig, idna, hyperframe, httpx-sse, hpack, h11, greenlet, frozenlist, docstring_parser, distro, coverage, click, charset_normalizer, certifi, cached-property, bidict, backoff, attrs, annotated-types, annotated-doc, aioitertools, aiohappyeyeballs, aiofiles, yarl, wsproto, uvicorn, typing-inspection, sqlalchemy, requests, referencing, python-frontmatter, python-datauri, pytest, pydantic-core, opentelemetry-proto, opentelemetry-api, markdown-it-py, httpcore2, httpcore, h2, grpcio, googleapis-common-protos, cffi, anyio, aiosignal, tiktoken, starlette, sounddevice, simple-websocket, rich, pytest-cov, pytest-asyncio, pydantic, posthog, opentelemetry-semantic-conventions, opentelemetry-exporter-otlp-proto-common, jsonschema-specifications, httpx2, httpx, cryptography, aiohttp, typer, sse-starlette, python-engineio, pydantic-settings, opentelemetry-sdk, openai, jsonschema, fastapi, anthropic, qdrant-client, python-socketio, opentelemetry-exporter-otlp-proto-http, opentelemetry-exporter-otlp-proto-grpc, mcp, dashscope, opentelemetry-exporter-otlp, mem0ai, agentscope
+
+Successfully installed agentscope-1.0.18 aiofiles-25.1.0 aiohappyeyeballs-2.7.1 aiohttp-3.14.3 aioitertools-0.13.0 aiosignal-1.4.0 annotated-doc-0.0.5 annotated-types-0.8.0 anthropic-1.7.0 anyio-4.15.1 attrs-26.1.0 backoff-2.2.1 bidict-0.24.1 cached-property-2.0.1 certifi-2026.7.22 cffi-2.1.1 charset_normalizer-3.5.1 click-8.5.0 coverage-7.16.1 cryptography-50.0.1 dashscope-1.27.6 distro-1.9.0 docstring_parser-0.18.0 fastapi-0.136.3 filetype-1.2.0 frozenlist-1.8.0 googleapis-common-protos-1.75.3 greenlet-3.5.6 grpcio-1.84.0 h11-0.16.0 h2-4.4.1 hpack-4.2.0 httpcore-1.0.9 httpcore2-2.13.0 httpx-0.28.1 httpx-sse-0.4.3 httpx2-2.13.0 hyperframe-6.1.0 idna-3.20 iniconfig-2.3.0 jiter-0.17.0 json5-0.15.0 json_repair-0.63.4 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 loguru-0.7.3 markdown-it-py-4.2.0 mcp-1.29.0 mdurl-0.1.2 mem0ai-1.0.11 multidict-6.9.0 numpy-2.5.3 openai-2.45.0 opentelemetry-api-1.44.0 opentelemetry-exporter-otlp-1.44.0 opentelemetry-exporter-otlp-proto-common-1.44.0 opentelemetry-exporter-otlp-proto-grpc-1.44.0 opentelemetry-exporter-otlp-proto-http-1.44.0 opentelemetry-proto-1.44.0 opentelemetry-sdk-1.44.0 opentelemetry-semantic-conventions-0.65b0 packaging-26.3 pluggy-1.6.0 portalocker-3.2.0 posthog-7.58.0 propcache-0.5.4 protobuf-6.33.6 pycparser-3.0 pydantic-2.12.3 pydantic-core-2.41.4 pydantic-settings-2.15.0 pygments-2.21.0 pyjwt-2.14.0 pytest-9.1.1 pytest-asyncio-1.4.0 pytest-cov-7.1.0 python-datauri-3.0.2 python-dotenv-1.2.2 python-engineio-4.14.0 python-frontmatter-1.3.0 python-multipart-0.0.32 python-socketio-5.17.0 pytz-2026.3.post1 pyyaml-6.0.3 qdrant-client-1.19.0 referencing-0.37.0 regex-2026.9.10 requests-2.34.2 rich-15.0.0 rpds-py-2026.6.3 shellingham-1.5.4 shortuuid-1.0.13 simple-websocket-1.1.0 sniffio-1.3.1 sounddevice-0.5.6 sqlalchemy-2.0.54 sse-starlette-3.4.11 starlette-1.6.0 tiktoken-0.14.0 tqdm-4.70.1 truststore-0.10.4 typer-0.27.2 typing-extensions-4.16.0 typing-inspection-0.4.4 urllib3-2.8.0 uvicorn-0.49.0 websocket-client-1.9.2 wsproto-1.3.2 yarl-1.25.1
+=== installed key versions (must match constraints) ===
+agentscope                               1.0.18
+dashscope                                1.27.6
+fastapi                                  0.136.3
+mcp                                      1.29.0
+mem0ai                                   1.0.11
+openai                                   2.45.0
+pydantic                                 2.12.3
+qdrant-client                            1.19.0
+uvicorn                                  0.49.0
+=== import the real dependency chain ===
+IMPORT_CHAIN_OK
+=== ALL DONE: 13:55:10 ===

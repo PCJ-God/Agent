@@ -1,0 +1,340 @@
+=== 0) 鏈嶅姟绔埌搴曟湁娌℃湁鍦ㄨ瀹㈡埛绔瘉涔︼紙瑙ｉ噴 schannel 鍙嶅鍗忓晢锛?==
+Protocol: TLSv1.3
+Verify return code: 0 (ok)
+
+=== 1) 娉ㄥ唽涓€涓敤鎴?===
+  token 闀垮害=32
+
+=== 2) 璧?nginx 鐨勬祦寮忚姹傦細姣忎釜浜嬩欢鎵撲笂鍒拌揪鏃堕棿 ===
+    锛堟椂闂存埑閫愭笎鎷夊紑 = 鐪熸祦寮忥紱鍏ㄩ儴鎸ゅ湪鏈€鍚庝竴鍒?= 琚紦鍐蹭簡锛?[+   1.12s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "鐢ㄦ埛", "last": false}
+[+   1.12s] 
+[+   1.14s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "璇锋眰", "last": false}
+[+   1.14s] 
+[+   1.16s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "绠€娲?, "last": false}
+[+   1.16s] 
+[+   1.19s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "鏄庣‘", "last": false}
+[+   1.19s] 
+[+   1.25s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "锛氬垎涓夌偣璇存槑鈥?, "last": false}
+[+   1.25s] 
+[+   1.36s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "浠€涔堟槸閫掑綊鈥濓紝", "last": false}
+[+   1.36s] 
+[+   1.47s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "姣忕偣涓€鍙ヨ瘽銆?, "last": false}
+[+   1.47s] 
+[+   1.56s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "璇ヤ换鍔℃棤闇€澶?, "last": false}
+[+   1.56s] 
+[+   1.65s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "姝ョ爺绌舵垨瀹℃煡", "last": false}
+[+   1.65s] 
+[+   1.77s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "锛屽睘浜庡熀纭€姒傚康", "last": false}
+[+   1.77s] 
+[+   1.82s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "闃愰噴锛屽彲鐩存帴浣?, "last": false}
+[+   1.82s] 
+[+   1.93s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "绛旓紝鏃犻渶璋?, "last": false}
+[+   1.93s] 
+[+   2.06s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "鐢?researcher 鎴?reviewer锛?, "last": false}
+[+   2.06s] 
+[+   2.13s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "涔熸棤闇€鍒涘缓璁″垝銆俓n\n浣?, "last": false}
+[+   2.13s] 
+[+   2.27s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "涓虹‘淇濆噯纭€т笌", "last": false}
+[+   2.27s] 
+[+   2.37s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "鏁欏閫傚垏鎬э紝鎴?, "last": false}
+[+   2.37s] 
+[+   2.48s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "灏嗗揩閫熸绱⑩€?, "last": false}
+[+   2.48s] 
+[+   2.57s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "閫掑綊鈥濈殑鏍囧噯", "last": false}
+[+   2.57s] 
+[+   2.66s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "瀹氫箟锛堝挨鍏跺叧娉?, "last": false}
+[+   2.66s] 
+[+   2.78s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "璁＄畻鏈虹瀛︿笌鏁板", "last": false}
+[+   2.78s] 
+[+   2.84s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "涓殑鍏辫瘑琛ㄨ堪锛夛紝浠?, "last": false}
+[+   2.84s] 
+[+   2.92s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "鏀拺涓夌偣绮剧偧闄堣堪", "last": false}
+[+   2.92s] 
+[+   3.06s] data: {"type": "chunk", "id": "Zh6vn5E7TQZFVNTmfxKPc8", "name": "Project Leader", "text": "銆俓n\n", "last": false}
+[+   3.06s] 
+[+   9.94s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "鎴?, "last": false}
+[+   9.94s] 
+[+   9.96s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "闇€瑕?, "last": false}
+[+   9.96s] 
+[+   9.99s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "鏍规嵁", "last": false}
+[+   9.99s] 
+[+  10.13s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "宸叉湁鐨勮儗鏅绱㈢粨鏋?, "last": false}
+[+  10.13s] 
+[+  10.23s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "锛屼负鐢ㄦ埛鐢熸垚涓夌偣", "last": false}
+[+  10.23s] 
+[+  10.31s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "鍏充簬鈥滀粈涔堟槸閫掑綊鈥濈殑", "last": false}
+[+  10.31s] 
+[+  10.39s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "绠€娲併€佸噯纭€佹暀瀛﹀弸", "last": false}
+[+  10.39s] 
+[+  10.50s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "濂界殑璇存槑銆俓n\n鏍规嵁绯荤粺", "last": false}
+[+  10.50s] 
+[+  10.54s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "淇℃伅锛屾垜宸茬粡瀹屾垚浜嗚儗鏅绱?, "last": false}
+[+  10.54s] 
+[+  10.62s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "锛岀‘璁や簡閫掑綊鐨勬牳蹇?, "last": false}
+[+  10.62s] 
+[+  10.65s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "瀹氫箟鍖呭惈涓夎绱狅細", "last": false}
+[+  10.65s] 
+[+  10.70s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "鑷紩鐢ㄣ€佸熀绾挎潯浠?, "last": false}
+[+  10.70s] 
+[+  10.78s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "銆侀棶棰樺垎瑙ｃ€傜幇鍦?, "last": false}
+[+  10.78s] 
+[+  10.88s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "闇€瑕佸熀浜庤繖浜涘彂鐜帮紝鎾板啓", "last": false}
+[+  10.88s] 
+[+  10.93s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "涓夌偣鍗曞彞瀹氫箟銆?, "last": false}
+[+  10.93s] 
+[+  11.06s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "\n\n璁╂垜鍒涘缓涓€涓鍒掓潵瀹屾垚杩欎釜", "last": false}
+[+  11.06s] 
+[+  11.09s] data: {"type": "chunk", "id": "Uxs8Ja9t5RHKeUfdUL7L5p", "name": "Project Leader", "text": "浠诲姟锛歕n\n", "last": false}
+[+  11.09s] 
+[+  14.97s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "鎴?, "last": false}
+[+  14.97s] 
+[+  15.00s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "灏嗗紑濮?, "last": false}
+[+  15.00s] 
+[+  15.04s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "鎵ц绗竴涓?, "last": false}
+[+  15.04s] 
+[+  15.08s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "瀛愪换鍔★細", "last": false}
+[+  15.08s] 
+[+  15.22s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "鎾板啓绗竴鍙ヨ瘽锛?, "last": false}
+[+  15.22s] 
+[+  15.32s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "瑙ｉ噴閫掑綊浣滀负", "last": false}
+[+  15.32s] 
+[+  15.39s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "鍑芥暟璋冪敤鑷韩鐨?, "last": false}
+[+  15.39s] 
+[+  15.48s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "鏈川锛堣嚜寮曠敤鐗规€?, "last": false}
+[+  15.48s] 
+[+  15.59s] data: {"type": "chunk", "id": "nXgBBJNWTFqqEsWT9ukajE", "name": "Project Leader", "text": "锛夈€俓n\n", "last": false}
+[+  15.59s] 
+[+  16.77s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "鎴?, "last": false}
+[+  16.77s] 
+[+  16.79s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "灏嗗畬鎴?, "last": false}
+[+  16.79s] 
+[+  16.84s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "绗竴涓瓙浠诲姟锛氭挵鍐?, "last": false}
+[+  16.84s] 
+[+  16.92s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "绗竴鍙ヨ瘽锛岃В閲婇€?, "last": false}
+[+  16.92s] 
+[+  16.96s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "褰掍綔涓哄嚱鏁拌皟鐢ㄨ嚜韬殑", "last": false}
+[+  16.96s] 
+[+  17.08s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "鏈川銆俓n\n閫掑綊鐨勬湰璐?, "last": false}
+[+  17.08s] 
+[+  17.13s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "鏄嚱鏁板湪瀹氫箟涓洿鎺?, "last": false}
+[+  17.13s] 
+[+  17.22s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "鎴栭棿鎺ュ湴璋冪敤", "last": false}
+[+  17.22s] 
+[+  17.32s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "鑷韩銆俓n\n鐜板湪鎴戝皢鏍囪", "last": false}
+[+  17.32s] 
+[+  17.38s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "杩欎釜瀛愪换鍔′负宸插畬鎴?, "last": false}
+[+  17.38s] 
+[+  17.46s] data: {"type": "chunk", "id": "YaPNbPnS5BYRrj7oufWx4d", "name": "Project Leader", "text": "锛歕n\n\n", "last": false}
+[+  17.46s] 
+[+  18.71s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "鎴?, "last": false}
+[+  18.71s] 
+[+  18.74s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "灏嗗畬鎴?, "last": false}
+[+  18.74s] 
+[+  18.79s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "绗簩涓瓙浠诲姟锛氭挵鍐欑浜?, "last": false}
+[+  18.79s] 
+[+  18.89s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "鍙ヨ瘽锛岃В閲婂熀绾挎潯浠讹紙", "last": false}
+[+  18.89s] 
+[+  18.95s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "鍩虹鎯呭喌锛夌殑蹇呰鎬?, "last": false}
+[+  18.95s] 
+[+  19.04s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "锛屼互闃叉鏃犻檺閫?, "last": false}
+[+  19.04s] 
+[+  19.14s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "褰掋€俓n\n閫掑綊蹇呴』", "last": false}
+[+  19.14s] 
+[+  19.19s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "鍖呭惈涓€涓槑纭殑鍩?, "last": false}
+[+  19.19s] 
+[+  19.27s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "绾挎潯浠讹紝褰撴弧瓒?, "last": false}
+[+  19.27s] 
+[+  19.37s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "璇ユ潯浠舵椂鍑芥暟鍋滄", "last": false}
+[+  19.37s] 
+[+  19.43s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "璋冪敤鑷韩锛屼粠鑰岄伩鍏?, "last": false}
+[+  19.43s] 
+[+  19.54s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "鏃犻檺寰幆銆俓n\n鐜板湪鎴戝皢", "last": false}
+[+  19.54s] 
+[+  19.60s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "鏍囪杩欎釜瀛愪换鍔′负宸插畬鎴?, "last": false}
+[+  19.60s] 
+[+  19.69s] data: {"type": "chunk", "id": "E7cYLi3ffHqGZCYfnhJ87k", "name": "Project Leader", "text": "锛歕n\n\n", "last": false}
+[+  19.69s] 
+[+  21.04s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "鎴?, "last": false}
+[+  21.04s] 
+[+  21.07s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "灏嗗畬鎴愮涓変釜", "last": false}
+[+  21.07s] 
+[+  21.12s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "瀛愪换鍔★細鎾板啓绗笁", "last": false}
+[+  21.12s] 
+[+  21.21s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "鍙ヨ瘽锛岃В閲婇€掑綊濡備綍", "last": false}
+[+  21.21s] 
+[+  21.27s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "閫氳繃灏嗛棶棰樺垎瑙ｄ负", "last": false}
+[+  21.27s] 
+[+  21.34s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "鏇村皬銆佺粨鏋勭浉鍚岀殑瀛愰棶棰?, "last": false}
+[+  21.34s] 
+[+  21.47s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "鏉ュ伐浣溿€俓n\n閫掑綊閫氳繃", "last": false}
+[+  21.47s] 
+[+  21.54s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "灏嗗師闂鍒嗚В涓鸿妯?, "last": false}
+[+  21.54s] 
+[+  21.63s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "鏇村皬浣嗙粨鏋勭浉鍚岀殑", "last": false}
+[+  21.63s] 
+[+  21.73s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "瀛愰棶棰橈紝鏈€缁堝綊", "last": false}
+[+  21.73s] 
+[+  21.78s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "绾︿负鍩虹嚎鏉′欢鍙?, "last": false}
+[+  21.78s] 
+[+  21.88s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "鐩存帴瑙ｅ喅鐨勫舰寮忋€俓n\n鐜板湪鎴戝皢", "last": false}
+[+  21.88s] 
+[+  21.96s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "鏍囪杩欎釜瀛愪换鍔′负宸插畬鎴?, "last": false}
+[+  21.96s] 
+[+  22.05s] data: {"type": "chunk", "id": "5tMGdRfgP6iAwHvanUckHW", "name": "Project Leader", "text": "锛歕n\n\n\n", "last": false}
+[+  22.05s] 
+[+  23.24s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鎵€鏈?, "last": false}
+[+  23.24s] 
+[+  23.27s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "瀛?, "last": false}
+[+  23.27s] 
+[+  23.30s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "浠诲姟鍧囧凡", "last": false}
+[+  23.30s] 
+[+  23.41s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "椤哄埄瀹屾垚銆傜幇鍦ㄦ垜灏嗗畬鎴?, "last": false}
+[+  23.41s] 
+[+  23.55s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鏁翠釜璁″垝锛屽苟鍚戠敤鎴锋彁渚?, "last": false}
+[+  23.55s] 
+[+  23.63s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鏈€缁堢殑涓夌偣瀹氫箟銆?, "last": false}
+[+  23.63s] 
+[+  23.76s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "\n\n鏍规嵁妫€绱㈠埌鐨勬牳蹇冨畾涔?, "last": false}
+[+  23.76s] 
+[+  23.88s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鍜岀敤鎴疯姹傦紙鍑嗙‘銆佺畝娲?, "last": false}
+[+  23.88s] 
+[+  23.97s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "銆佹暀瀛﹀弸濂斤紱姣?, "last": false}
+[+  23.97s] 
+[+  24.04s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鐐逛竴鍙ヨ瘽锛涢€昏緫閫掕繘", "last": false}
+[+  24.04s] 
+[+  24.08s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "锛氬畾涔夆啋绾︽潫鈫掑姛鑳?, "last": false}
+[+  24.08s] 
+[+  24.13s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "锛夛紝鎴戝凡鐢熸垚浠ヤ笅", "last": false}
+[+  24.13s] 
+[+  24.21s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "涓夌偣璇存槑锛歕n\n1.", "last": false}
+[+  24.21s] 
+[+  24.25s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": " 閫掑綊鏄竴绉嶅嚱鏁板湪鍏?, "last": false}
+[+  24.25s] 
+[+  24.33s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "瀹氫箟涓皟鐢ㄨ嚜韬殑缂栫▼", "last": false}
+[+  24.33s] 
+[+  24.35s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鎶€鏈€俓n2.", "last": false}
+[+  24.35s] 
+[+  24.40s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": " 閫掑綊蹇呴』瀹氫箟涓€涓熀", "last": false}
+[+  24.40s] 
+[+  24.50s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "绾挎潯浠讹紙缁堟鎯呭舰锛夛紝", "last": false}
+[+  24.50s] 
+[+  24.56s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "褰撻棶棰樼畝鍖栧埌璇?, "last": false}
+[+  24.56s] 
+[+  24.63s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鏉′欢鏃剁洿鎺ヨ繑鍥炵粨鏋滐紝", "last": false}
+[+  24.63s] 
+[+  24.75s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "闃叉鏃犻檺璋冪敤銆俓n3", "last": false}
+[+  24.75s] 
+[+  24.81s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": ". 閫掑綊閫氳繃灏?, "last": false}
+[+  24.81s] 
+[+  24.90s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鍘熼棶棰樺垎瑙ｄ负瑙勬ā鏇?, "last": false}
+[+  24.90s] 
+[+  25.02s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "灏忋€佺粨鏋勭浉鍚岀殑瀛愰棶棰?, "last": false}
+[+  25.02s] 
+[+  25.08s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "锛岄€愭绠€鍖栫洿鑷宠揪鍒板熀", "last": false}
+[+  25.08s] 
+[+  25.20s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "绾挎潯浠躲€俓n\n杩欎簺瀹氫箟", "last": false}
+[+  25.20s] 
+[+  25.25s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "涓ユ牸閬靛惊浜嗘潈濞佹潵婧愬己璋?, "last": false}
+[+  25.25s] 
+[+  25.37s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鐨勪笁瑕佺礌锛堣嚜寮曠敤銆?, "last": false}
+[+  25.37s] 
+[+  25.44s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鍩虹嚎鏉′欢銆侀棶棰樺垎瑙?, "last": false}
+[+  25.44s] 
+[+  25.54s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "锛夛紝璇█绠€娲佹棤鍐椾綑锛?, "last": false}
+[+  25.54s] 
+[+  25.66s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "鏈娇鐢ㄥ鏉傛湳璇垨", "last": false}
+[+  25.66s] 
+[+  25.71s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "涓句緥锛岀鍚堟暀瀛﹀弸濂芥€ц姹?, "last": false}
+[+  25.71s] 
+[+  25.85s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "锛屽苟褰㈡垚浜嗘竻鏅扮殑閫昏緫", "last": false}
+[+  25.85s] 
+[+  25.89s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "閫掕繘鍏崇郴銆俓n\n鐜板湪鎴?, "last": false}
+[+  25.89s] 
+[+  25.98s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "灏嗘寮忕粨鏉熻璁″垝锛?, "last": false}
+[+  25.98s] 
+[+  26.07s] data: {"type": "chunk", "id": "8pBmPjkq9xGqbXoQBsKzAs", "name": "Project Leader", "text": "\n\n\n", "last": false}
+[+  26.07s] 
+[+  32.31s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "宸?, "last": false}
+[+  32.31s] 
+[+  32.34s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鎴愬姛", "last": false}
+[+  32.34s] 
+[+  32.37s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "瀹屾垚鐢ㄦ埛", "last": false}
+[+  32.37s] 
+[+  32.46s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "浠诲姟锛氬垎涓夌偣璇存槑鈥?, "last": false}
+[+  32.46s] 
+[+  32.53s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "浠€涔堟槸閫掑綊鈥濓紝姣?, "last": false}
+[+  32.53s] 
+[+  32.55s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鐐逛竴鍙ヨ瘽锛屼弗鏍兼弧瓒?, "last": false}
+[+  32.55s] 
+[+  32.63s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鍑嗙‘銆佺畝娲併€佹暀瀛﹀弸", "last": false}
+[+  32.63s] 
+[+  32.73s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "濂界殑瑕佹眰锛屼笖閫昏緫閫?, "last": false}
+[+  32.73s] 
+[+  32.79s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "杩涳紙瀹氫箟鈫掔害鏉熲啋", "last": false}
+[+  32.79s] 
+[+  32.88s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鍔熻兘锛夛紝鏃犱妇渚嬨€佹棤鍐?, "last": false}
+[+  32.88s] 
+[+  33.01s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "浣欍€佹棤鏈鍫?, "last": false}
+[+  33.01s] 
+[+  33.06s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鐮屻€俓n\n鏈€缁堜氦浠樺唴瀹?, "last": false}
+[+  33.06s] 
+[+  33.14s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "濡備笅锛歕n\n1. 閫?, "last": false}
+[+  33.14s] 
+[+  33.34s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "褰掓槸涓€绉嶅嚱鏁板湪鍏跺畾涔変腑", "last": false}
+[+  33.34s] 
+[+  33.34s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "璋冪敤鑷韩鐨勭紪绋嬫妧鏈€?, "last": false}
+[+  33.34s] 
+[+  33.41s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "  \n2. 閫掑綊", "last": false}
+[+  33.41s] 
+[+  33.52s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "蹇呴』瀹氫箟涓€涓熀绾挎潯浠讹紙", "last": false}
+[+  33.52s] 
+[+  33.60s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "缁堟鎯呭舰锛夛紝褰撻棶棰樼畝鍖?, "last": false}
+[+  33.60s] 
+[+  33.71s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鍒拌鏉′欢鏃剁洿鎺ヨ繑鍥?, "last": false}
+[+  33.71s] 
+[+  33.78s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "缁撴灉锛岄槻姝㈡棤闄愯皟鐢?, "last": false}
+[+  33.78s] 
+[+  33.87s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "銆? \n3. 閫?, "last": false}
+[+  33.87s] 
+[+  33.99s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "褰掗€氳繃灏嗗師闂鍒嗚В", "last": false}
+[+  33.99s] 
+[+  34.05s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "涓鸿妯℃洿灏忋€佺粨鏋?, "last": false}
+[+  34.05s] 
+[+  34.14s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鐩稿悓鐨勫瓙闂锛岄€愭", "last": false}
+[+  34.14s] 
+[+  34.25s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "绠€鍖栫洿鑷宠揪鍒板熀绾挎潯浠?, "last": false}
+[+  34.25s] 
+[+  34.31s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "銆俓n\n涓烘敮鎸佸悗缁彲鑳?, "last": false}
+[+  34.31s] 
+[+  34.38s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鐨勫悓绫绘暀瀛︿换鍔★紝", "last": false}
+[+  34.38s] 
+[+  34.48s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鎴戝皢鏈鍏抽敭缁撹涓庣敤鎴?, "last": false}
+[+  34.48s] 
+[+  34.56s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "鍋忓ソ瀛樺叆闀挎湡璁板繂锛?, "last": false}
+[+  34.56s] 
+[+  34.67s] data: {"type": "chunk", "id": "LJy52iNtETYY9DgFTzyGoz", "name": "Project Leader", "text": "\n\n\n\n", "last": false}
+[+  34.67s] 
+[+  43.98s] data: {"type": "chunk", "id": "jZbNQqgsiD3gm5BEig2Rkt", "name": "Project Leader", "text": "宸?, "last": false}
+[+  43.98s] 
+[+  44.00s] data: {"type": "chunk", "id": "jZbNQqgsiD3gm5BEig2Rkt", "name": "Project Leader", "text": "鏍规嵁", "last": false}
+[+  44.00s] 
+[+  44.03s] data: {"type": "chunk", "id": "jZbNQqgsiD3gm5BEig2Rkt", "name": "Project Leader", "text": "绯荤粺", "last": false}
+[+  44.03s] 
+[+  44.13s] data: {"type": "chunk", "id": "jZbNQqgsiD3gm5BEig2Rkt", "name": "Project Leader", "text": "鎻愮ず鍜屽綋鍓嶄笂涓嬫枃瀹屾垚鍏ㄩ儴", "last": false}
+[+  44.13s] 
+[+  44.28s] data: {"type": "chunk", "id": "jZbNQqgsiD3gm5BEig2Rkt", "name": "Project Leader", "text": "浠诲姟銆傛棤闇€鏂板缓璁″垝锛屼换鍔?, "last": false}
+[+  44.28s] 
+[+  44.33s] data: {"type": "chunk", "id": "jZbNQqgsiD3gm5BEig2Rkt", "name": "Project Leader", "text": "闂幆宸插畬鎴愩€?, "last": false}
+[+  44.33s] 
+[+  44.36s] data: {"type": "done", "response": "宸叉牴鎹郴缁熸彁绀哄拰褰撳墠涓婁笅鏂囧畬鎴愬叏閮ㄤ换鍔°€傛棤闇€鏂板缓璁″垝锛屼换鍔￠棴鐜凡瀹屾垚銆?}
+[+  44.36s] 
+--- 鍏?322 琛? 鎬昏€楁椂 44.37s ---
+
+=== 3) nginx 渚ф槸鍚︾湡鐨勬妸娴侀€忎紶浜嗭紙鐪嬪畠鑷繁鐨勬棩蹇楋級===
+183.64.62.164 - - [21/Sep/2026:15:06:51 +0800] "GET / HTTP/1.1" 200 24853 "-" "curl/8.21.0"
+183.64.62.164 - - [21/Sep/2026:15:06:51 +0800] "GET /health HTTP/1.1" 301 178 "-" "curl/8.21.0"
+183.64.62.164 - - [21/Sep/2026:15:06:51 +0800] "GET /health HTTP/1.1" 200 46 "-" "curl/8.21.0"
+127.0.0.1 - - [21/Sep/2026:15:07:27 +0800] "" 400 0 "-" "-"
+127.0.0.1 - - [21/Sep/2026:15:07:27 +0800] "POST /api/auth/register HTTP/2.0" 200 152 "-" "curl/8.18.0"
+127.0.0.1 - - [21/Sep/2026:15:08:11 +0800] "POST /api/chat/stream HTTP/2.0" 200 21296 "-" "curl/8.18.0"
+=== DONE ===

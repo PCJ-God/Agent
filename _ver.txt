@@ -1,0 +1,143 @@
+WARNING: Package(s) not found: loguru
+Name: agentscope
+Version: 1.0.18
+Summary: AgentScope: A Flexible yet Robust Multi-Agent Platform.
+Home-page: https://github.com/agentscope-ai/agentscope
+Author: 
+Author-email: SysML team of Alibaba Tongyi Lab <gaodawei.gdw@alibaba-inc.com>
+License-Expression: Apache-2.0
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: aiofiles, aioitertools, anthropic, dashscope, docstring_parser, filetype, json5, json_repair, mcp, numpy, openai, opentelemetry-api, opentelemetry-exporter-otlp, opentelemetry-sdk, opentelemetry-semantic-conventions, python-datauri, python-frontmatter, python-socketio, shortuuid, sounddevice, sqlalchemy, tiktoken
+Required-by: 
+---
+Name: openai
+Version: 2.45.0
+Summary: The official Python library for the openai API
+Home-page: https://github.com/openai/openai-python
+Author: 
+Author-email: OpenAI <support@openai.com>
+License: Apache-2.0
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: anyio, distro, httpx, jiter, pydantic, sniffio, tqdm, typing-extensions
+Required-by: agentscope, langchain-openai, llama-index-embeddings-openai, llama-index-llms-openai, mem0ai, ragas
+---
+Name: dashscope
+Version: 1.27.6
+Summary: dashscope client sdk library
+Home-page: https://dashscope.aliyun.com/
+Author: Alibaba Cloud
+Author-email: dashscope@alibabacloud.com
+License: Apache 2.0
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: aiohttp, certifi, cryptography, httpx, httpx-sse, requests, rich, typer, typing_extensions, websocket-client
+Required-by: agentscope, llama-index-embeddings-dashscope, llama-index-llms-dashscope
+---
+Name: mcp
+Version: 1.29.0
+Summary: Model Context Protocol SDK
+Home-page: https://modelcontextprotocol.io
+Author: Anthropic, PBC.
+Author-email: 
+License: MIT
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: anyio, httpx, httpx-sse, jsonschema, pydantic, pydantic-settings, pyjwt, python-multipart, pywin32, sse-starlette, starlette, typing-extensions, typing-inspection, uvicorn
+Required-by: agentscope
+---
+Name: mem0ai
+Version: 1.0.11
+Summary: Long-term memory for AI Agents
+Home-page: 
+Author: 
+Author-email: Mem0 <support@mem0.ai>
+License-Expression: Apache-2.0
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: openai, posthog, protobuf, pydantic, pytz, qdrant-client, sqlalchemy
+Required-by: 
+---
+Name: qdrant-client
+Version: 1.19.0
+Summary: Client library for the Qdrant vector search engine
+Home-page: https://github.com/qdrant/qdrant-client
+Author: Andrey Vasnetsov
+Author-email: andrey@qdrant.tech
+License: Apache-2.0
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: grpcio, httpx, numpy, portalocker, protobuf, pydantic, urllib3
+Required-by: mem0ai
+---
+Name: pydantic
+Version: 2.12.3
+Summary: Data validation using Python type hints
+Home-page: https://github.com/pydantic/pydantic
+Author: 
+Author-email: Samuel Colvin <s@muelcolvin.com>, Eric Jolibois <em.jolibois@gmail.com>, Hasan Ramezani <hasan.r67@gmail.com>, Adrian Garcia Badaracco <1755071+adriangb@users.noreply.github.com>, Terrence Dorsey <terry@pydantic.dev>, David Montague <david@pydantic.dev>, Serge Matveenko <lig@countzero.co>, Marcelo Trylesinski <marcelotryle@gmail.com>, Sydney Runkle <sydneymarierunkle@gmail.com>, David Hewitt <mail@davidhewitt.io>, Alex Hall <alex.mojaki@gmail.com>, Victorien Plot <contact@vctrn.dev>, Douwe Maan <hi@douwe.me>
+License-Expression: MIT
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: annotated-types, pydantic-core, typing-extensions, typing-inspection
+Required-by: anthropic, banks, fastapi, gradio, langchain, langchain-core, langsmith, llama-index-core, llama-index-instrumentation, llama-index-workflows, mcp, mem0ai, openai, pydantic-settings, qdrant-client
+---
+Name: aiohttp
+Version: 3.14.3
+Summary: Async http client/server framework (asyncio)
+Home-page: https://github.com/aio-libs/aiohttp
+Author: 
+Author-email: 
+License: Apache-2.0 AND MIT
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: aiohappyeyeballs, aiosignal, async-timeout, attrs, frozenlist, multidict, propcache, typing_extensions, yarl
+Required-by: alibabacloud-tea, darabonba-core, dashscope, langchain-community, llama-index-core
+---
+Name: PyYAML
+Version: 6.0.3
+Summary: YAML parser and emitter for Python
+Home-page: https://pyyaml.org/
+Author: Kirill Simonov
+Author-email: xi@resolvent.net
+License: MIT
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: 
+Required-by: datasets, gradio, huggingface_hub, jupytext, langchain, langchain-community, langchain-core, llama-index-core, mmengine, python-frontmatter, transformers
+---
+Name: python-dotenv
+Version: 1.2.2
+Summary: Read key-value pairs from a .env file and set them as environment variables
+Home-page: 
+Author: 
+Author-email: Saurabh Kumar <me+github@saurabh-kumar.com>
+License: BSD-3-Clause
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: 
+Required-by: pydantic-settings, pymilvus
+---
+Name: fastapi
+Version: 0.136.3
+Summary: FastAPI framework, high performance, easy to learn, fast to code, ready for production
+Home-page: https://github.com/fastapi/fastapi
+Author: 
+Author-email: =?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>
+License-Expression: MIT
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: annotated-doc, pydantic, starlette, typing-extensions, typing-inspection
+Required-by: gradio
+---
+Name: uvicorn
+Version: 0.49.0
+Summary: The lightning-fast ASGI server.
+Home-page: https://uvicorn.dev/
+Author: 
+Author-email: Tom Christie <tom@tomchristie.com>
+License-Expression: BSD-3-Clause
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: click, h11, typing-extensions
+Required-by: gradio, mcp
+---
+Name: rich
+Version: 15.0.0
+Summary: Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal
+Home-page: https://github.com/Textualize/rich
+Author: Will McGugan
+Author-email: willmcgugan@gmail.com
+License: MIT
+Location: c:\users\34288\.conda\envs\llm_learn\lib\site-packages
+Requires: markdown-it-py, pygments
+Required-by: dashscope, mmengine, typer

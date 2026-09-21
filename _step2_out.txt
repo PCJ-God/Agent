@@ -1,0 +1,22 @@
+=== pull latest (constraints may have been pushed) ===
+Already up to date.
+=== dry-run WITH constraints, on Python Python 3.14.4 ===
+DRY-RUN OK
+--- resolved vs tested ---
+OK  agentscope      tested=1.0.18     resolved=1.0.18
+OK  aiohttp         tested=3.14.3     resolved=3.14.3
+OK  dashscope       tested=1.27.6     resolved=1.27.6
+OK  fastapi         tested=0.136.3    resolved=0.136.3
+OK  mcp             tested=1.29.0     resolved=1.29.0
+OK  mem0ai          tested=1.0.11     resolved=1.0.11
+OK  openai          tested=2.45.0     resolved=2.45.0
+OK  pydantic        tested=2.12.3     resolved=2.12.3
+OK  python-dotenv   tested=1.2.2      resolved=1.2.2
+OK  pyyaml          tested=6.0.3      resolved=6.0.3
+OK  qdrant-client   tested=1.19.0     resolved=1.19.0
+OK  rich            tested=15.0.0     resolved=15.0.0
+OK  uvicorn         tested=0.49.0     resolved=0.49.0
+total packages: 109
+=== anything built from source? ===
+(none reported)
+=== done ===

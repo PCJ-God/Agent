@@ -1,0 +1,26 @@
+=== start app as 'agent' user (nohup, log -> /tmp/app.log) ===
+=== wait for /health (max 70s) ===
+ready after ~2s
+--- GET /health ---
+{"status":"ok","mcp":"initializing","sessions":0}
+--- unauthenticated GET /api/sessions (expect 401) ---
+  status=401
+--- POST /api/auth/register ---
+  body: {"user_id":"4a36a028d78e493d9f5aec2fd5216c2c","name":"smoke-test","created_at":"2026-09-21T06:08:40+00:00","token":"6cfb3ff790d04406891e047523ab8f0d"}
+--- GET /api/auth/me with token (expect 200) ---
+  status=200
+--- GET /api/sessions with token (expect 200) ---
+  status=200
+=== app log tail ===
+14:08:38 | INFO    | src.access.server - HTTP 鐩戝惉 127.0.0.1:8000锛圱LS 浜ょ粰鍙嶅悜浠ｇ悊锛?INFO:     Started server process [47869]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:41716 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41720 - "GET /api/sessions HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:41734 - "POST /api/auth/register HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41748 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41754 - "GET /api/sessions HTTP/1.1" 200 OK
+=== stop app ===
+port 8000 released
+=== DONE ===

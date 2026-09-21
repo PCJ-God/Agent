@@ -1,0 +1,22 @@
+=== 1) 鍏堝仠鎺?systemd 閭ｄ釜锛堝惁鍒?8000 琚崰锛?==
+  8000 宸查噴鏀?
+=== 2) 鐢ㄤ綘灏嗘潵瑕佹暡鐨勯偅鏉″懡浠ゅ墠鍙板惎鍔紙鐩稿璺緞銆乤gent 鐢ㄦ埛銆侀」鐩洰褰曪級===
+    cd /opt/agent
+    sudo -u agent ./.venv/bin/python scripts/run_server.py
+
+=== 3) 鍚姩鏃ュ織锛堜綘鑷繁鏁茬殑鏃跺€欑湅鍒扮殑灏辨槸杩欎簺锛?==
+15:17:04 | INFO    | src.access.server - HTTP 鐩戝惉 127.0.0.1:8000锛圱LS 浜ょ粰鍙嶅悜浠ｇ悊锛?INFO:     Started server process [65982]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+
+=== 4) 鐪熺殑璧锋潵浜嗗悧 ===
+  /health : {"status":"ok","mcp":"initializing","sessions":0}
+  /       : 200 text/html; charset=utf-8
+  鍓嶅彴璺戠殑鏃跺€欑綉绔欑収鏍疯兘鐢ㄥ悧锛坣ginx 浠ｇ悊鍒?8000锛?
+  https://127.0.0.1/health -> 200
+
+=== 5) 鏀跺熬锛氱瓑瀹冭秴鏃堕€€鍑猴紝鎶?systemd 浜ゅ洖鍘?===
+  is-active: active
+  health   : {"status":"ok","mcp":"initializing","sessions":0}
+=== DONE ===
