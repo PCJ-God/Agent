@@ -35,6 +35,11 @@ data/qdrant/
 *.sqlite3
 *.db
 
+# TLS 证书与私钥：自签证书生成在 data/certs/，私钥绝不能进仓库
+data/certs/
+*.pem
+*.key
+
 # Frontend dependencies and build output
 node_modules/
 frontend/dist/

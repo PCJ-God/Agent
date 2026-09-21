@@ -27,7 +27,7 @@ async def _chat_with_cleanup(awaitable: Awaitable[str]) -> str:
         await close_shared_aio_session()
 
 
-async def run_interactive() -> None:
+async def run_interactive(session_id: str = "cli-default", user_id: str = "local") -> None:
     """交互式多轮对话 (Hierarchical 模式)。
 
     整个会话共用一个事件循环：Agent、MCP 连接、向量库客户端都持有
@@ -38,9 +38,11 @@ async def run_interactive() -> None:
     print("Agent 智能教学助手 — 层级协作模式 (Hierarchical)")
     print("架构: 接入层 → 调度层(Leader) → 执行层(Researcher + Reviewer)")
     print("输入 'quit' 或 'exit' 退出")
+    print(f"用户 ID: {user_id}   任务 ID: {session_id}")
+    print("(--user / --session 可切换；不同用户、不同任务之间记忆互不可见)")
     print("=" * 60)
 
-    team = await HierarchicalTeam.create()
+    team = await HierarchicalTeam.create(session_id=session_id, user_id=user_id)
 
     try:
         while True:
@@ -62,9 +64,13 @@ async def run_interactive() -> None:
         await close_shared_aio_session()
 
 
-async def run_single_question(question: str) -> str:
+async def run_single_question(
+    question: str, session_id: str = "cli-default", user_id: str = "local"
+) -> str:
     """单次提问。"""
-    return await _chat_with_cleanup(run_hierarchical(question))
+    return await _chat_with_cleanup(
+        run_hierarchical(question, session_id=session_id, user_id=user_id)
+    )
 
 
 def main():
@@ -76,6 +82,20 @@ def main():
     parser = argparse.ArgumentParser(description="Agent 智能教学助手 — 层级协作模式")
     parser.add_argument("--question", "-q", type=str, help="直接提问")
     parser.add_argument("--interactive", "-i", action="store_true", help="交互模式")
+    parser.add_argument(
+        "--session",
+        "-s",
+        type=str,
+        default="cli-default",
+        help="任务 ID。不同任务的记忆互相隔离；复用同一 ID 可持续累积长期记忆",
+    )
+    parser.add_argument(
+        "--user",
+        "-u",
+        type=str,
+        default="local",
+        help="用户 ID。不同用户的记忆与会话完全隔离（CLI 单机场景默认 local）",
+    )
 
     args = parser.parse_args()
 
@@ -87,10 +107,12 @@ def main():
 
     if args.question:
         print(f"\n问题: {args.question}\n")
-        response = asyncio.run(run_single_question(args.question))
+        response = asyncio.run(
+            run_single_question(args.question, args.session, args.user)
+        )
         print(f"\n回复:\n{response}")
     else:
-        asyncio.run(run_interactive())
+        asyncio.run(run_interactive(args.session, args.user))
 
 
 if __name__ == "__main__":

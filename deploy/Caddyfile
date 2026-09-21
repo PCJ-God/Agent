@@ -1,0 +1,51 @@
+# Caddy 反向代理 —— 用法: caddy run --config deploy/Caddyfile
+#
+# Caddy 会自动申请并续期 Let's Encrypt 证书，只要把域名解析到这台机器、
+# 并且 80/443 可达即可，不需要 certbot。
+#
+# 改一处：把 agent.example.com 换成你的域名。
+
+agent.example.com {
+	# ── 流式对话 ──
+	# 单独拎出来处理，原因有两条：
+	#   1. flush_interval -1 关掉缓冲，增量文本才会立刻推给前端
+	#      （默认值会把 SSE 攒起来，前端就看不到实时输出了）
+	#   2. 不能压缩 —— 压缩同样会引入缓冲
+	handle /api/chat/stream {
+		reverse_proxy 127.0.0.1:8000 {
+			flush_interval -1
+			# 一轮协作可能跑几分钟，别中途断开
+			transport http {
+				read_timeout 600s
+				write_timeout 600s
+			}
+		}
+	}
+
+	# ── 其它请求 ──
+	handle {
+		encode zstd gzip
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	log {
+		output file /var/log/caddy/agent.log
+	}
+}
+
+# ── 本地试 HTTPS（没有域名时）──
+# 用 Caddy 自带的本地 CA 签证书，浏览器需要信任一次 Caddy 的根证书：
+#   caddy trust
+# 解开下面这段，注释掉上面那段即可。
+#
+# localhost:8443 {
+# 	tls internal
+# 	handle /api/chat/stream {
+# 		reverse_proxy 127.0.0.1:8000 {
+# 			flush_interval -1
+# 		}
+# 	}
+# 	handle {
+# 		reverse_proxy 127.0.0.1:8000
+# 	}
+# }

@@ -16,7 +16,7 @@ from agentscope.message import Msg, TextBlock
 from agentscope.plan import PlanNotebook
 from agentscope.tool import ToolResponse, Toolkit
 
-from src.config import ENABLE_LONG_TERM_MEMORY
+from src.config import ENABLE_LONG_TERM_MEMORY, HISTORY_REPLAY_TURNS, LTM_SCOPE
 from src.execution.agents.agent_factory import (
     create_research_agent,
     create_review_agent,
@@ -24,6 +24,7 @@ from src.execution.agents.agent_factory import (
 from src.execution.agents.react_agent import create_react_agent
 from src.execution.tools.tool_manager import ToolPool, create_mcp_client
 from src.storage.memory.long_term import create_long_term_memory
+from src.storage.memory.session_store import append_turn, ensure_session, recent_turns
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,15 @@ LEADER_PROMPT = (
 )
 
 
-def _create_shared_long_term_memory():
+def _create_shared_long_term_memory(session_id: str = "", user_id: str = "local"):
     """创建共享的长期记忆；失败降级为 None，不阻断团队启动。
+
+    Args:
+        session_id: 会话（任务）ID。LTM_SCOPE=session 时映射到 Mem0 的
+            run_id，使同一用户的不同任务之间互相隔离。
+        user_id: 用户 ID，映射到 Mem0 的 user_id —— **多用户隔离的根本**。
+            公网部署下必须是认证层给出的真实用户，绝不能用常量，
+            否则所有用户的记忆会落进同一个池子。
 
     Returns:
         Mem0LongTermMemory 实例，或 None
@@ -58,9 +66,12 @@ def _create_shared_long_term_memory():
         # 三个 Agent 共用同一个实例 = 同一个记忆池。
         # Mem0 检索按 metadata 匹配，所以 agent_name 用团队名而不是各自的
         # Agent 名字 —— 否则研究员写入的记忆会被 Leader 的检索直接过滤掉。
+        # 隔离维度: user_id(谁) + run_id(哪个任务)；agent_id 是团队名，不是用户维度。
+        session_name = session_id if LTM_SCOPE == "session" else ""
         return create_long_term_memory(
             agent_name="TeachingTeam",
-            user_name="user",
+            user_name=user_id,
+            session_name=session_name,
             enabled=True,
         )
     except Exception as e:
@@ -79,10 +90,17 @@ class HierarchicalTeam:
     三个 Agent 都具备: 历史自动压缩 + 长期记忆(可主动读写) + 远程 MCP 工具与 Skill。
     规划能力 (PlanNotebook) 只给 Leader —— 它是任务的拆解者与调度者。
 
-    请用 `await HierarchicalTeam.create()` 装配，不要直接实例化。
+    一个 HierarchicalTeam 实例 = 某个用户在某个会话（任务）下的团队。
+    隔离有三个维度：进程、用户 (user_id)、任务 (session_id)。
+    长期记忆的隔离靠 Mem0 的 (agent_id, user_id, run_id) 三元组 ——
+    其中 user_id 是多用户场景的根本，绝不能是常量。
+
+    请用 `await HierarchicalTeam.create(session_id, user_id)` 装配，不要直接实例化。
     """
 
     def __init__(self) -> None:
+        self.session_id = ""
+        self.user_id = "local"
         self.mcp_client = None
         self.long_term_memory = None
         self.tool_pool: ToolPool | None = None
@@ -94,21 +112,29 @@ class HierarchicalTeam:
         self.leader: ReActAgent
 
     @classmethod
-    async def create(cls) -> "HierarchicalTeam":
+    async def create(
+        cls, session_id: str = "", user_id: str = "local"
+    ) -> "HierarchicalTeam":
         """装配团队（异步：需要建立 MCP 客户端并抓取工具）。
+
+        Args:
+            session_id: 会话（任务）ID。同一用户的不同任务之间完全隔离。
+            user_id: 用户 ID。不同用户的团队在任何层面都不共享东西。
 
         Returns:
             装配完成的 HierarchicalTeam
         """
         team = cls()
-        await team._build()
+        await team._build(session_id, user_id)
         return team
 
-    async def _build(self) -> None:
+    async def _build(self, session_id: str = "", user_id: str = "local") -> None:
         # ── 共享资源 ──
         # MCP 客户端与工具池全队共用一份（客户端无状态，没有连接需要释放）。
+        self.session_id = session_id
+        self.user_id = user_id
         self.mcp_client = await create_mcp_client()
-        self.long_term_memory = _create_shared_long_term_memory()
+        self.long_term_memory = _create_shared_long_term_memory(session_id, user_id)
         self.tool_pool = await ToolPool.create(self.mcp_client)
 
         # ── 执行层: Member Agents ──
@@ -164,6 +190,30 @@ class HierarchicalTeam:
             plan_notebook=PlanNotebook(),
         )
 
+        # ── 会话（任务）历史回放 ──
+        # 重新打开一个任务时，把最近的对话灌回 Leader 的记忆，
+        # 这样它是「接着聊」，而不是从零开始。
+        if session_id:
+            await asyncio.to_thread(ensure_session, user_id, session_id)
+            history = await asyncio.to_thread(
+                recent_turns, user_id, session_id, HISTORY_REPLAY_TURNS
+            )
+            if history:
+                await self.leader.memory.add(
+                    [
+                        Msg(
+                            name=m["name"] or m["role"],
+                            content=m["content"],
+                            role=m["role"],
+                        )
+                        for m in history
+                    ]
+                )
+                logger.info(
+                    "任务 %s…/%s: 回放 %d 条历史消息",
+                    user_id[:8], session_id, len(history),
+                )
+
     def enable_streaming(self, queue: asyncio.Queue) -> None:
         """把全队的输出接入同一个消息队列，供接入层做流式转发。
 
@@ -194,17 +244,27 @@ class HierarchicalTeam:
         """
         msg = Msg(name="user", content=user_request, role="user")
         response = await self.leader(msg)
-        return response.get_text_content() or ""
+        reply = response.get_text_content() or ""
+        # 写入该任务的会话历史：UI 的分页浏览、下次打开时的回放都读它
+        if self.session_id:
+            await asyncio.to_thread(
+                append_turn, self.user_id, self.session_id, user_request, reply
+            )
+        return reply
 
 
-async def run_hierarchical(user_request: str) -> str:
+async def run_hierarchical(
+    user_request: str, session_id: str = "", user_id: str = "local"
+) -> str:
     """便捷函数: 单次层级协作调用。
 
     Args:
         user_request: 用户请求
+        session_id: 会话（任务）ID
+        user_id: 用户 ID（多用户隔离的根本）
 
     Returns:
         Leader 回复
     """
-    team = await HierarchicalTeam.create()
+    team = await HierarchicalTeam.create(session_id=session_id, user_id=user_id)
     return await team.chat(user_request)
