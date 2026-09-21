@@ -4,6 +4,7 @@
 """
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 
 from agentscope.mcp import HttpStatelessClient
 from agentscope.tool import Toolkit
@@ -12,10 +13,28 @@ from src.config import DASHSCOPE_API_KEY, MCP_SERVER_URL, SKILLS_DIR
 from src.execution.tools.skill_files import (
     SKILL_INSTRUCTION,
     SKILL_TEMPLATE,
+    frontmatter_name,
     make_skill_reader,
 )
 
 logger = logging.getLogger(__name__)
+
+# 远程 MCP 服务的名字。定义在这里而不是写在 create_mcp_client 里面，
+# 是因为界面上要展示它 —— 两处各写一份字面量迟早会对不上。
+MCP_SERVICE_NAME = "web_search_service"
+
+
+def mcp_server_info() -> dict:
+    """MCP 服务的展示信息。
+
+    **只给主机名，不给完整 URL，更不给 header** —— header 里是 DASHSCOPE_API_KEY，
+    这个字典会经由 /api/mcp 返回给浏览器。
+    """
+    return {
+        "name": MCP_SERVICE_NAME,
+        "transport": "streamable_http",
+        "host": urlparse(MCP_SERVER_URL).hostname or "",
+    }
 
 
 async def create_mcp_client() -> HttpStatelessClient | None:
@@ -32,7 +51,7 @@ async def create_mcp_client() -> HttpStatelessClient | None:
     """
     try:
         return HttpStatelessClient(
-            name="web_search_service",
+            name=MCP_SERVICE_NAME,
             transport="streamable_http",
             url=MCP_SERVER_URL,
             headers={"Authorization": f"Bearer {DASHSCOPE_API_KEY}"},
@@ -56,6 +75,25 @@ def list_skill_dirs(skills_dir: str = "") -> list[str]:
     """
     root = Path(skills_dir) if skills_dir else SKILLS_DIR
     return [str(p.parent) for p in sorted(root.glob("*/SKILL.md"))]
+
+
+def _merge_skill_dirs(builtin: list[str], extra: list[str]) -> list[str]:
+    """内置技能优先；用户技能重名就跳过并记一条日志。
+
+    重名必须在这里拦掉：agentscope 的 `register_agent_skill()` 遇到重名直接抛
+    ValueError（见 _toolkit.py:1381-1384），一旦抛出去**整个团队都装配不起来** ——
+    用户只是取了个和内置技能一样的名字，不该让他的会话彻底不可用。
+    """
+    seen = {frontmatter_name(Path(d)) for d in builtin}
+    merged = list(builtin)
+    for d in extra:
+        name = frontmatter_name(Path(d))
+        if name in seen:
+            logger.warning("技能 '%s' 与已有技能重名，已跳过: %s", name, d)
+            continue
+        seen.add(name)
+        merged.append(d)
+    return merged
 
 
 class ToolPool:
@@ -95,12 +133,14 @@ class ToolPool:
         cls,
         mcp_client: HttpStatelessClient | None = None,
         skills_dir: str = "",
+        extra_skill_dirs: list[str] | None = None,
     ) -> "ToolPool":
         """抓取一次工具，形成池。
 
         Args:
             mcp_client: 已建立的 MCP 客户端；None 表示池里只有 Skill
-            skills_dir: Skill 根目录，默认取配置
+            skills_dir: 内置 Skill 根目录，默认取配置
+            extra_skill_dirs: 额外的技能目录（用户自建技能的物化目录）
 
         Returns:
             就绪的 ToolPool
@@ -121,7 +161,9 @@ class ToolPool:
                     )
                 )
 
-        skill_dirs = list_skill_dirs(skills_dir)
+        skill_dirs = _merge_skill_dirs(
+            list_skill_dirs(skills_dir), list(extra_skill_dirs or [])
+        )
 
         logger.info(
             "工具池就绪: MCP 工具 %d 个%s | Skill %d 个%s",

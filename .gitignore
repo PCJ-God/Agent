@@ -35,6 +35,9 @@ data/qdrant/
 *.sqlite3
 *.db
 
+# 用户自建技能的物化目录（运行期数据，源头在 SQLite 的 user_skills 表）
+data/skills/
+
 # TLS 证书与私钥：自签证书生成在 data/certs/，私钥绝不能进仓库
 data/certs/
 *.pem

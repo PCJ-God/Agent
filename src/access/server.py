@@ -36,20 +36,31 @@ from src.config import (
     check_api_key,
     setup_logging,
 )
+from src.execution.tools.skill_files import frontmatter_meta
+from src.execution.tools.tool_manager import (
+    create_mcp_client,
+    list_skill_dirs,
+    mcp_server_info,
+)
 from src.orchestration.hierarchical import HierarchicalTeam
 from src.storage.memory.session_store import (
+    SkillValidationError,
     attach_credentials,
     count_sessions,
     create_user,
+    create_user_skill,
     create_user_with_credentials,
     delete_session,
+    delete_user_skill,
     ensure_session,
     get_user_by_username,
     issue_token,
     list_sessions,
+    list_user_skills,
     page_messages,
     revoke_token,
     session_exists,
+    update_user_skill,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,6 +109,42 @@ class ChatRequest(BaseModel):
     )
 
 
+class SkillRequest(BaseModel):
+    slug: str = Field(description="技能目录名：小写字母/数字/横线，1-40 位")
+    name: str = Field(description="技能名称（展示用）")
+    description: str = Field(default="", description="一句话说明它解决什么问题")
+    body: str = Field(description="技能正文（Markdown）。模型会在需要时按需读取它")
+
+
+class SkillPatchRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    body: Optional[str] = None
+
+
+class SkillInfo(BaseModel):
+    skill_id: str = Field(default="", description="用户技能 ID；内置技能为空")
+    slug: str = Field(description="技能目录名。也是模型调 read_skill_file 时用的名字")
+    name: str = ""
+    description: str = ""
+    body: str = Field(
+        default="",
+        description="技能正文。列表里一并返回，前端编辑时直接预填，省一次请求",
+    )
+    builtin: bool = Field(default=False, description="内置技能：只读，不能改或删")
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class McpStatus(BaseModel):
+    status: str = Field(description="connected / unreachable / unavailable")
+    name: str = ""
+    transport: str = ""
+    host: str = Field(default="", description="只有主机名：不带密钥，也不给完整 URL")
+    tools: list[str] = Field(default_factory=list, description="实测列出来的工具名")
+    detail: str = Field(default="", description="失败原因；成功时为空")
+
+
 class AgentResponse(BaseModel):
     success: bool = Field(description="是否成功执行")
     response: str = Field(description="Agent 回复内容")
@@ -141,6 +188,26 @@ def _evict_locked(exclude: tuple[str, str]) -> None:
                 break
         else:
             return      # 全都在忙，暂时超限
+
+
+async def invalidate_user_teams(user_id: str) -> int:
+    """丢掉某个用户的所有缓存团队，返回丢掉的数量。
+
+    用户改了自己的技能之后必须调用 —— 技能是在**装配**时物化进工具池的，
+    缓存里的团队不会自己更新。正在对话的（锁被持有）不动：让它跑完，
+    下次访问自然会重建。
+
+    重建是安全且被设计过的路径：历史都在 SQLite 里，会按 HISTORY_REPLAY_TURNS
+    回放，LRU 淘汰走的也是同一条路。
+    """
+    dropped = 0
+    async with _registry_lock:
+        for key in [k for k in _teams if k[0] == user_id]:
+            if session_lock(key).locked():
+                continue
+            _teams.pop(key, None)
+            dropped += 1
+    return dropped
 
 
 async def get_team(user_id: str, session_id: str) -> HierarchicalTeam:
@@ -554,6 +621,133 @@ async def chat_stream(req: ChatRequest, user: dict = Depends(current_user)):
 # ── 前端静态文件 ──
 FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+
+# ── 技能：内置（只读）+ 用户自建 ──
+def _skill_info(row: dict, builtin: bool = False) -> SkillInfo:
+    return SkillInfo(
+        skill_id=row.get("skill_id", ""),
+        slug=row["slug"],
+        name=row.get("name") or row["slug"],
+        description=row.get("description", ""),
+        body=row.get("body", ""),
+        builtin=builtin,
+        created_at=row.get("created_at", ""),
+        updated_at=row.get("updated_at", ""),
+    )
+
+
+@app.get("/api/skills", response_model=list[SkillInfo])
+async def api_list_skills(user: dict = Depends(current_user)):
+    """列出当前可用的技能：内置的（只读）+ 自己建的。"""
+    builtin: list[SkillInfo] = []
+    for d in list_skill_dirs():
+        path = Path(d)
+        meta = frontmatter_meta(path)
+        builtin.append(
+            SkillInfo(
+                slug=path.name,
+                name=meta.get("name") or path.name,
+                description=meta.get("description", ""),
+                builtin=True,
+            )
+        )
+    mine = [
+        _skill_info(row)
+        for row in await asyncio.to_thread(list_user_skills, user["user_id"])
+    ]
+    return builtin + mine
+
+
+@app.post("/api/skills", response_model=SkillInfo, status_code=201)
+async def api_create_skill(req: SkillRequest, user: dict = Depends(current_user)):
+    """新建用户技能，**保存即生效**。
+
+    这里会让该用户所有空闲的缓存团队失效，下次提问时重新装配、把新技能物化进
+    工具池。历史都在 SQLite 里，重建不丢上下文。
+    """
+    try:
+        row = await asyncio.to_thread(
+            create_user_skill,
+            user["user_id"],
+            req.slug,
+            req.name,
+            req.description,
+            req.body,
+        )
+    except SkillValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="技能目录名已存在")
+
+    dropped = await invalidate_user_teams(user["user_id"])
+    logger.info(
+        "技能已创建: user=%s slug=%s 失效团队=%d",
+        user["user_id"][:8],
+        row["slug"],
+        dropped,
+    )
+    return _skill_info(row)
+
+
+@app.put("/api/skills/{skill_id}", response_model=SkillInfo)
+async def api_update_skill(
+    skill_id: str, req: SkillPatchRequest, user: dict = Depends(current_user)
+):
+    """改自己的技能（只改传进来的字段）。"""
+    try:
+        row = await asyncio.to_thread(
+            update_user_skill,
+            user["user_id"],
+            skill_id,
+            req.name,
+            req.description,
+            req.body,
+        )
+    except SkillValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if row is None:
+        raise HTTPException(status_code=404, detail="技能不存在")
+    await invalidate_user_teams(user["user_id"])
+    return _skill_info(row)
+
+
+@app.delete("/api/skills/{skill_id}")
+async def api_delete_skill(skill_id: str, user: dict = Depends(current_user)):
+    """删自己的技能。内置技能不在库里，所以删不到（返回 404）。"""
+    ok = await asyncio.to_thread(delete_user_skill, user["user_id"], skill_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="技能不存在")
+    await invalidate_user_teams(user["user_id"])
+    return {"ok": True}
+
+
+@app.get("/api/mcp", response_model=McpStatus)
+async def api_mcp_status(user: dict = Depends(current_user)):
+    """MCP 现状：配的是哪个服务、通不通、能用哪些工具。
+
+    状态是**实测**的，不读 /health 里那个字段 —— 后者取自"已经装配过的团队"，
+    进程刚重启、还没人提问时它必然显示 initializing，把"MCP 没连上"和
+    "还没人用过"混成同一句话。所以这里真的建一次客户端、列一次工具。
+
+    刻意只读：支持"自己添加 MCP 服务器"意味着要保存第三方 token，并允许 Agent
+    向任意地址发起请求 —— 那是另一件事，也得先定好谁能加、加到谁名下。
+    """
+    info = mcp_server_info()
+    client = await create_mcp_client()
+    if client is None:
+        return McpStatus(status="unavailable", detail="客户端创建失败", **info)
+
+    try:
+        tools = await asyncio.wait_for(client.list_tools(), timeout=10)
+    except asyncio.TimeoutError:
+        return McpStatus(status="unreachable", detail="10 秒内没有响应", **info)
+    except Exception as e:
+        # 网络 / DNS / 鉴权失败都归到这里；截断一下，避免把整段响应体带回前端
+        reason = f"{type(e).__name__}: {e}"[:300]
+        return McpStatus(status="unreachable", detail=reason, **info)
+
+    return McpStatus(status="connected", tools=[t.name for t in tools], **info)
 
 
 @app.get("/")
