@@ -289,6 +289,112 @@
     font-family: var(--mono);
   }
   @media (max-width: 768px) { .sidebar { display: none; } }
+
+  /* ── 账号面板 ── */
+  .acct-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 40;
+  }
+  .acct-panel {
+    position: fixed;
+    z-index: 41;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(92vw, 380px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .acct-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .acct-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .acct-close:hover { color: var(--text); }
+  .acct-note {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .acct-field { display: block; margin-bottom: 10px; }
+  .acct-field span {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .acct-field input {
+    width: 100%;
+    padding: 9px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .acct-field input:focus { outline: none; border-color: var(--accent); }
+  .acct-primary {
+    width: 100%;
+    padding: 10px;
+    cursor: pointer;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .acct-primary:disabled { opacity: 0.6; cursor: default; }
+  .acct-danger {
+    width: 100%;
+    padding: 10px;
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--red);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .acct-danger:hover { border-color: var(--red); }
+  .acct-link {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: inherit;
+    text-decoration: underline;
+  }
+  .acct-link:hover { color: var(--text); }
+  .acct-msg {
+    margin-top: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    word-break: break-word;
+  }
 </style>
 </head>
 <body>
@@ -312,6 +418,7 @@
     <span class="current-wf">Hierarchical 层级协作</span>
     <select class="task-select" id="taskSelect" title="切换任务（会话）"></select>
     <button class="icon-btn" id="newTaskBtn">新建任务</button>
+    <button class="icon-btn" id="acctBtn" title="账号设置 / 登录">账号</button>
   </div>
 
   <div class="chat-area" id="chatArea">
@@ -329,6 +436,18 @@
     <div class="input-hint">Enter 发送 · Shift+Enter 换行</div>
   </div>
 </main>
+
+<!-- 账号面板：匿名账号在这里设置用户名密码（历史原地保留）；
+     已绑定账号可以退出当前设备，或用密码登录到另一个账号。 -->
+<div class="acct-mask" id="acctMask" hidden></div>
+<div class="acct-panel" id="acctPanel" hidden>
+  <div class="acct-head">
+    <span>账号</span>
+    <button class="acct-close" id="acctClose" title="关闭">&times;</button>
+  </div>
+  <div id="acctBody"></div>
+  <div class="acct-msg" id="acctMsg"></div>
+</div>
 
 <!-- 渲染依赖 (jsdelivr): Markdown / XSS 消毒 / LaTeX 公式 -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
@@ -352,9 +471,14 @@
   }
 
   // 凭证：存在 localStorage（同浏览器共享，刷新/换标签页都还在）。
-  // 没有就先注册一个，后端发 uuid token。
+  // 没有就先匿名注册（打开即用，不需要填任何东西）；之后可以绑定用户名密码，
+  // 或者用已有的用户名密码登录到别的账号。
   let TOKEN = localStorage.getItem('agent_token') || '';
   let USER_ID = localStorage.getItem('agent_user_id') || '';
+  // 账号信息（是否已绑定用户名密码）。**必须在 renderFooter() 第一次被调用之前
+  // 声明** —— renderFooter 会读它，而它是 let，声明写晚了就是又一次 TDZ 崩溃，
+  // 顶层异常会打断整个脚本，症状是「打字但发送没反应」。
+  let ACCOUNT = { is_anonymous: true, username: null, user_id: USER_ID };
 
   async function register() {
     const res = await fetch('/api/auth/register', {
@@ -388,8 +512,11 @@
   let mcpState = '未知';
 
   function renderFooter() {
-    const uid = USER_ID ? USER_ID.slice(0, 8) : '未登录';
-    mcpFooter.textContent = `MCP: ${mcpState}  |  用户: ${uid}  |  任务: ${SESSION_ID}`;
+    const who = ACCOUNT.username
+      ? ACCOUNT.username
+      : (USER_ID ? '匿名 ' + USER_ID.slice(0, 8) : '未登录');
+    mcpFooter.textContent = `MCP: ${mcpState}  |  用户: ${who}  |  任务: ${SESSION_ID}`;
+    acctBtn.textContent = ACCOUNT.username || '账号';
   }
   // 下面这些 const 必须先声明。mcpFooter 是 const，存在暂时性死区(TDZ)：
   // 若在这之前调用 renderFooter()，会抛
@@ -403,6 +530,12 @@
   const taskSelect = document.getElementById('taskSelect');
   const newTaskBtn = document.getElementById('newTaskBtn');
   const mcpFooter = document.getElementById('mcpFooter');
+  const acctBtn = document.getElementById('acctBtn');
+  const acctPanel = document.getElementById('acctPanel');
+  const acctMask = document.getElementById('acctMask');
+  const acctBody = document.getElementById('acctBody');
+  const acctMsg = document.getElementById('acctMsg');
+  const acctClose = document.getElementById('acctClose');
 
   renderFooter();
 
@@ -411,6 +544,218 @@
     mcpState = d.mcp || '未知';
     renderFooter();
   }).catch(() => {});
+
+  // ── 账号面板 ──
+  // 三个视图：anon（匿名 → 设置用户名密码）/ named（已绑定 → 退出或换号）
+  // / login（登录已有账号）。
+  function acctDetail(d) {
+    // FastAPI 的错误体是 {"detail": "..."}；校验失败时 detail 是数组
+    if (!d) return '请求失败';
+    if (typeof d.detail === 'string') return d.detail;
+    if (Array.isArray(d.detail)) {
+      return d.detail.map(x => x.msg || '').join('；') || '请求失败';
+    }
+    return '请求失败';
+  }
+
+  function acctField(labelText, type, autocomplete) {
+    const wrap = document.createElement('label');
+    wrap.className = 'acct-field';
+    const span = document.createElement('span');
+    span.textContent = labelText;
+    const input = document.createElement('input');
+    input.type = type;
+    input.autocomplete = autocomplete;
+    wrap.append(span, input);
+    return { wrap: wrap, input: input };
+  }
+
+  function acctNote(text) {
+    const p = document.createElement('p');
+    p.className = 'acct-note';
+    p.textContent = text;
+    return p;
+  }
+
+  function renderAccount(view) {
+    acctBody.textContent = '';
+    acctMsg.textContent = '';
+    const mode = view || (ACCOUNT.username ? 'named' : 'anon');
+
+    if (mode === 'anon') {
+      acctBody.appendChild(acctNote(
+        '你现在是匿名账号 —— 打开即用，不需要注册。设置用户名和密码之后，'
+        + '就能在别的设备登录、看到同一份历史；已经产生的任务和历史都留在原处。'
+      ));
+      const u = acctField('用户名（3-32 位，字母/数字/下划线/点/横线）', 'text', 'username');
+      const p = acctField('密码（至少 8 位）', 'password', 'new-password');
+      const btn = document.createElement('button');
+      btn.className = 'acct-primary';
+      btn.textContent = '设置用户名和密码';
+      btn.addEventListener('click', () => submitBind(u.input.value, p.input.value, btn));
+      const link = document.createElement('button');
+      link.className = 'acct-link';
+      link.textContent = '我已有账号，去登录';
+      link.addEventListener('click', () => renderAccount('login'));
+      acctBody.append(u.wrap, p.wrap, btn, link);
+      return;
+    }
+
+    if (mode === 'login') {
+      acctBody.appendChild(acctNote(
+        '用已有的用户名和密码登录。这台设备会切到那个账号，看到它的任务与历史。'
+      ));
+      const u = acctField('用户名', 'text', 'username');
+      const p = acctField('密码', 'password', 'current-password');
+      const btn = document.createElement('button');
+      btn.className = 'acct-primary';
+      btn.textContent = '登录';
+      btn.addEventListener('click', () => submitLogin(u.input.value, p.input.value, btn));
+      const link = document.createElement('button');
+      link.className = 'acct-link';
+      link.textContent = '返回';
+      link.addEventListener('click', () => renderAccount());
+      acctBody.append(u.wrap, p.wrap, btn, link);
+      return;
+    }
+
+    const note = acctNote('已登录账号：');
+    const nameEl = document.createElement('b');
+    nameEl.textContent = ACCOUNT.username || '';
+    note.append(nameEl, document.createTextNode(
+      '。退出只会吊销这台设备的凭证，账号和历史都还在，随时能用密码重新登录。'
+    ));
+    acctBody.appendChild(note);
+
+    const out = document.createElement('button');
+    out.className = 'acct-danger';
+    out.textContent = '退出登录（仅这台设备）';
+    out.addEventListener('click', () => submitLogout(out));
+    const other = document.createElement('button');
+    other.className = 'acct-link';
+    other.textContent = '用另一个账号登录';
+    other.addEventListener('click', () => renderAccount('login'));
+    acctBody.append(out, other);
+  }
+
+  function openAccount() {
+    renderAccount();
+    acctPanel.hidden = false;
+    acctMask.hidden = false;
+  }
+
+  function closeAccount() {
+    acctPanel.hidden = true;
+    acctMask.hidden = true;
+  }
+
+  // 换账号：换凭证，清掉当前任务与聊天区，再载入新账号的任务列表。
+  // 不换 SESSION_ID 的话会把上一个账号的任务 ID 带到新账号名下。
+  async function switchAccount(me) {
+    TOKEN = me.token;
+    USER_ID = me.user_id;
+    ACCOUNT = me;
+    localStorage.setItem('agent_token', TOKEN);
+    localStorage.setItem('agent_user_id', USER_ID);
+    SESSION_ID = newSessionId();
+    sessionStorage.setItem('agent_session_id', SESSION_ID);
+
+    chatArea.textContent = '';
+    const box = document.createElement('div');
+    box.className = 'welcome';
+    const h1 = document.createElement('h1');
+    h1.textContent = '已切换到账号 ' + (me.username || '');
+    const p = document.createElement('p');
+    p.textContent = '下面是该账号已有的任务历史。';
+    box.append(h1, p);
+    chatArea.appendChild(box);
+
+    renderFooter();
+    await refreshTaskList();
+    await loadLatestPage();
+  }
+
+  async function submitBind(username, password, btn) {
+    btn.disabled = true;
+    acctMsg.textContent = '正在设置…';
+    try {
+      const r = await fetch('/api/auth/bind', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + TOKEN
+        },
+        body: JSON.stringify({ username: username, password: password })
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        acctMsg.textContent = '❌ ' + acctDetail(d);
+        return;
+      }
+      ACCOUNT = d;
+      renderAccount();
+      acctMsg.textContent = '✅ 已设置。以后在任何设备用这个用户名密码登录，都能看到同一份历史。';
+      renderFooter();
+    } catch (e) {
+      acctMsg.textContent = '❌ 请求失败：' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function submitLogin(username, password, btn) {
+    btn.disabled = true;
+    acctMsg.textContent = '正在登录…';
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: password })
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        acctMsg.textContent = '❌ ' + acctDetail(d);
+        return;
+      }
+      const who = d.username;
+      await switchAccount(d);
+      renderAccount();
+      acctMsg.textContent = '✅ 已登录为 ' + who + '。';
+    } catch (e) {
+      acctMsg.textContent = '❌ 请求失败：' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function submitLogout(btn) {
+    btn.disabled = true;
+    acctMsg.textContent = '正在退出…';
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + TOKEN }
+      });
+    } catch (e) {
+      // 网络失败也继续往下走：本地凭证照清，别卡在"看起来还登着"的状态
+    }
+    // 退出后回到匿名（新开一个匿名账号），这样不注册也能接着用
+    ACCOUNT = await register();
+    SESSION_ID = newSessionId();
+    sessionStorage.setItem('agent_session_id', SESSION_ID);
+    chatArea.textContent = '';
+    renderFooter();
+    await refreshTaskList();
+    renderAccount();
+    acctMsg.textContent = '已退出登录，现在是新的匿名账号。';
+  }
+
+  acctBtn.addEventListener('click', openAccount);
+  acctClose.addEventListener('click', closeAccount);
+  acctMask.addEventListener('click', closeAccount);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !acctPanel.hidden) closeAccount();
+  });
 
   userInput.addEventListener('input', () => {
     userInput.style.height = 'auto';
@@ -751,17 +1096,18 @@
   (async () => {
     try {
       if (!TOKEN) {
-        await register();
+        ACCOUNT = await register();
       } else {
         // 已有 token：校验一次，失效就重新注册
         const r = await fetch('/api/auth/me', {
           headers: { Authorization: 'Bearer ' + TOKEN }
         });
         if (r.ok) {
-          USER_ID = (await r.json()).user_id;
+          ACCOUNT = await r.json();
+          USER_ID = ACCOUNT.user_id;
           localStorage.setItem('agent_user_id', USER_ID);
         } else if (r.status === 401) {
-          await register();
+          ACCOUNT = await register();
         }
       }
     } catch (e) { /* 下面两个请求失败时也会暴露问题 */ }

@@ -8,6 +8,7 @@
 import asyncio
 import json
 import logging
+import sqlite3
 import time
 import uuid
 from collections import OrderedDict
@@ -21,7 +22,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from src.access.auth import current_user
+from src.access import passwords
+from src.access.auth import bearer_token, current_user
 from src.config import (
     FORWARDED_ALLOW_IPS,
     HOST,
@@ -36,12 +38,17 @@ from src.config import (
 )
 from src.orchestration.hierarchical import HierarchicalTeam
 from src.storage.memory.session_store import (
+    attach_credentials,
     count_sessions,
     create_user,
+    create_user_with_credentials,
     delete_session,
     ensure_session,
+    get_user_by_username,
+    issue_token,
     list_sessions,
     page_messages,
+    revoke_token,
     session_exists,
 )
 
@@ -54,12 +61,29 @@ DEFAULT_SESSION = "default"
 
 class RegisterRequest(BaseModel):
     name: str = Field(default="", description="可选的名字，便于识别")
+    username: str = Field(
+        default="", description="用户名；与 password 一起给出即为具名账号"
+    )
+    password: str = Field(
+        default="", description="密码（至少 8 位）；留空则创建匿名账号"
+    )
+
+
+class CredentialsRequest(BaseModel):
+    username: str = Field(description="用户名（不区分大小写）")
+    password: str = Field(description="密码")
 
 
 class UserInfo(BaseModel):
     user_id: str = Field(description="用户 ID（长期记忆按它隔离）")
     name: str = ""
     created_at: str = ""
+    username: Optional[str] = Field(
+        default=None, description="具名账号的用户名；匿名为 null"
+    )
+    is_anonymous: bool = Field(
+        default=True, description="是否尚未绑定用户名密码（匿名账号）"
+    )
 
 
 class RegisterResponse(UserInfo):
@@ -190,18 +214,160 @@ async def health():
 
 
 # ── 认证 ──
+# 两条拿到 token 的路：匿名（register 不带凭据，打开即用）与具名
+# （register 带凭据直接建号 / login 用密码换 token）。
+#
+# 登录失败节流：scrypt 已把单次尝试压到 ~40ms，但仅靠它挡不住针对弱密码的
+# 在线爆破。这里按用户名记失败次数，超限短暂拒绝（进程内计数；本项目单进程，
+# 多 worker 时各算各的，仍能显著抬高爆破成本）。
+#
+# 取舍：按用户名计数意味着攻击者可以用错误密码把某个已知账号短暂锁住。
+# 对当前场景（公网演示、账号数少）可接受；更稳妥要「账号 + 来源 IP」双维度，
+# 那需要 nginx 传真实 IP（见 deploy/nginx.conf）。
+_LOGIN_FAILS: dict[str, list] = {}      # username -> [失败次数, 窗口起点]
+_LOGIN_WINDOW = 300.0                   # 统计窗口（秒）
+_LOGIN_MAX_FAILS = 8                    # 窗口内允许的失败次数
+_LOGIN_MAX_KEYS = 2000                  # 上限，避免被随机用户名撑爆内存
+
+
+def _login_blocked(username: str) -> bool:
+    """该用户名在当前窗口内是否已被节流。"""
+    rec = _LOGIN_FAILS.get(username)
+    if rec is None:
+        return False
+    count, start = rec
+    if time.time() - start >= _LOGIN_WINDOW:
+        _LOGIN_FAILS.pop(username, None)    # 窗口过了，重新计数
+        return False
+    return count >= _LOGIN_MAX_FAILS
+
+
+def _note_login_failure(username: str) -> None:
+    """记一次登录失败（登录成功时由调用方清掉）。"""
+    if len(_LOGIN_FAILS) >= _LOGIN_MAX_KEYS:
+        _LOGIN_FAILS.clear()                # 被随机用户名刷爆时整体重置
+    now = time.time()
+    count, start = _LOGIN_FAILS.get(username, (0, now))
+    if now - start >= _LOGIN_WINDOW:
+        count, start = 0, now
+    _LOGIN_FAILS[username] = [count + 1, start]
+
+
 @app.post("/api/auth/register", response_model=RegisterResponse)
 async def api_register(req: RegisterRequest):
-    """注册：发放一个 uuid4 token。
+    """注册并发放 token。
+
+    - 不给 username/password：建**匿名**账号（保持「打开即用」）
+    - 给了 username/password：建**具名**账号，之后可跨设备用密码登录
 
     客户端保存 token，之后所有请求带 `Authorization: Bearer <token>`。
     """
-    return await asyncio.to_thread(create_user, req.name)
+    if not (req.username or req.password):
+        return await asyncio.to_thread(create_user, req.name)
+
+    if err := passwords.username_error(req.username):
+        raise HTTPException(status_code=400, detail=err)
+    if err := passwords.password_error(req.password):
+        raise HTTPException(status_code=400, detail=err)
+
+    # scrypt 要几十毫秒，放线程池算，别卡住事件循环
+    pwd_hash = await asyncio.to_thread(passwords.hash_password, req.password)
+    try:
+        return await asyncio.to_thread(
+            create_user_with_credentials,
+            passwords.normalise_username(req.username),
+            pwd_hash,
+            req.name,
+        )
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="用户名已被占用")
+
+
+@app.post("/api/auth/login", response_model=RegisterResponse)
+async def api_login(req: CredentialsRequest):
+    """用用户名 + 密码登录，换一个**新的** token。
+
+    每次登录发新 token，所以可以多设备同时登录：不会把已登录的设备踢下线，
+    登出也只影响当前这一个 token。
+    """
+    username = passwords.normalise_username(req.username)
+    if _login_blocked(username):
+        raise HTTPException(
+            status_code=429,
+            detail=f"登录失败次数过多，请 {int(_LOGIN_WINDOW / 60)} 分钟后再试",
+        )
+
+    row = await asyncio.to_thread(get_user_by_username, username)
+    if row is None or not row.get("password_hash"):
+        # 账号不存在时也烧掉一次 scrypt 的时间，否则响应快慢能被用来枚举用户名
+        _note_login_failure(username)
+        await asyncio.to_thread(passwords.burn_time)
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    ok = await asyncio.to_thread(
+        passwords.verify_password, req.password, row["password_hash"]
+    )
+    if not ok:
+        _note_login_failure(username)
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    _LOGIN_FAILS.pop(username, None)
+    token = await asyncio.to_thread(issue_token, row["user_id"])
+    return RegisterResponse(
+        user_id=row["user_id"],
+        name=row["name"],
+        created_at=row["created_at"],
+        username=row["username"],
+        is_anonymous=False,
+        token=token,
+    )
+
+
+@app.post("/api/auth/bind", response_model=UserInfo)
+async def api_bind(req: CredentialsRequest, user: dict = Depends(current_user)):
+    """给**当前匿名账号**补上用户名 + 密码，已有历史原样带走。
+
+    为什么不是「新建账号再搬历史」：那要跨 sessions / messages / 向量库三套
+    存储做复制，任何一步失败都会留下半迁移状态。直接把凭据绑到现有 user_id
+    上，历史天然就在原地。
+
+    绑定后当前 token 仍有效（还是同一个 user_id），但之后就能用密码在别的
+    设备登录、看到同一份历史。
+    """
+    if err := passwords.username_error(req.username):
+        raise HTTPException(status_code=400, detail=err)
+    if err := passwords.password_error(req.password):
+        raise HTTPException(status_code=400, detail=err)
+
+    username = passwords.normalise_username(req.username)
+    pwd_hash = await asyncio.to_thread(passwords.hash_password, req.password)
+    try:
+        ok = await asyncio.to_thread(
+            attach_credentials, user["user_id"], username, pwd_hash
+        )
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="用户名已被占用")
+    if not ok:
+        raise HTTPException(status_code=409, detail="当前账号已绑定用户名，不能重复绑定")
+    # attach_credentials 会把展示名一并改成用户名，这里与库里保持一致
+    return {**user, "name": username, "username": username, "is_anonymous": False}
+
+
+@app.post("/api/auth/logout")
+async def api_logout(token: str = Depends(bearer_token)):
+    """吊销当前 token。
+
+    只吊销这一个：同账号其他设备的登录不受影响，账号与历史也都还在
+    （彻底删号是另一件事）。
+    """
+    if not await asyncio.to_thread(revoke_token, token):
+        raise HTTPException(status_code=401, detail="token 无效或已吊销")
+    return {"ok": True}
 
 
 @app.get("/api/auth/me", response_model=UserInfo)
 async def api_me(user: dict = Depends(current_user)):
-    """校验 token 并返回当前用户。"""
+    """校验 token 并返回当前用户（含是否已绑定用户名密码）。"""
     return user
 
 

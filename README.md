@@ -112,24 +112,42 @@ curl -X POST http://127.0.0.1:8000/api/chat ^
 
 ### 认证
 
+两种用法：**匿名**（打开即用，什么都不用填）和**具名**（用户名 + 密码，可跨设备）。
+
 ```bash
-# 1. 注册，拿 token（uuid4）
+# 1. 匿名：直接拿一个 token
 curl -X POST http://127.0.0.1:8000/api/auth/register \
      -H "Content-Type: application/json" -d '{"name":""}'
-# → {"user_id":"...","token":"...","name":"","created_at":"..."}
+# → {"user_id":"...","token":"...","name":"","created_at":"...",
+#    "username":null,"is_anonymous":true}
 
-# 2. 之后所有请求带上它
+# 2. 具名：注册时就带上用户名密码（也可以先匿名，之后再把凭据绑上去）
+curl -X POST http://127.0.0.1:8000/api/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"username":"alice","password":"at-least-8-chars"}'
+
+# 3. 之后所有请求带上 token
 curl http://127.0.0.1:8000/api/sessions -H "Authorization: Bearer <token>"
 ```
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/auth/register` | 发一个 uuid token |
-| `GET` | `/api/auth/me` | 校验 token，返回当前用户 |
+| `POST` | `/api/auth/register` | 不带 `username`/`password` → 匿名账号；带了 → 具名账号（重名 409） |
+| `POST` | `/api/auth/login` | 用户名 + 密码换一个**新** token（支持多设备并存） |
+| `POST` | `/api/auth/bind` | 给**当前匿名账号**补上用户名密码，已有历史原地保留 |
+| `POST` | `/api/auth/logout` | 吊销**当前** token（其他设备不受影响，账号和历史都还在） |
+| `GET` | `/api/auth/me` | 校验 token，返回当前用户（含 `username` / `is_anonymous`） |
 
-token 相当于「用户名 + 密码」合一：**只在 HTTPS 下暴露**，吊销用
-`session_store.revoke_token(token)`。将来接真正的登录体系时，只需替换
-`src/access/auth.py` 里的 `current_user`，下游一行都不用改。
+密码用标准库 `hashlib.scrypt` 哈希（内存硬，不引入新依赖），存储格式自描述，
+将来换算法只需按前缀分派校验逻辑。用户名不区分大小写；登录失败按用户名做
+窗口限流（见 `server.py` 的 `_LOGIN_WINDOW` / `_LOGIN_MAX_FAILS`）。
+
+**为什么要「绑定凭据」而不是「新建账号」**：`user_id` 是数据归属的唯一依据
+（会话、消息、长期记忆都按它隔离），所以注册的本质是给当前这个 `user_id`
+补一组「能再次证明身份」的凭据 —— 历史不用搬，天然就在原地。
+
+token 仍是「一票通行」的凭证：**只在 HTTPS 下暴露**，要吊销用
+`POST /api/auth/logout`（`session_store.revoke_token`）。
 
 ### 任务接口
 
@@ -155,7 +173,7 @@ token 相当于「用户名 + 密码」合一：**只在 HTTPS 下暴露**，吊
 
 - **CLI**：`python scripts/run_agent.py -i --session taskA --user alice`（默认 `cli-default` / `local`）
 - **HTTP**：带 `Authorization` 头，请求体里带 `session_id`
-- **网页端**：首次打开自动注册并存下 token；顶栏「任务」下拉框切换、「新建任务」开新任务；向上滚动自动加载更早的历史
+- **网页端**：首次打开自动建一个匿名账号并存下 token（打开即用，不用填任何东西）；顶栏「账号」按钮可以设置用户名密码（之后在别的设备登录能看到同一份历史）、退出登录或用另一个账号登录；「任务」下拉框切换任务、「新建任务」开新任务；向上滚动自动加载更早的历史
 
 ## 项目结构
 
