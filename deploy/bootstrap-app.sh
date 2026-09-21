@@ -67,7 +67,11 @@ info "代码已就位"
 step "4/6 虚拟环境与依赖（约 1.9 GB，走腾讯云镜像）"
 [ -x "$APP_DIR/.venv/bin/python" ] || sudo -u "$APP_USER" python3 -m venv "$APP_DIR/.venv"
 sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -q --upgrade pip
-sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -q -i "$PIP_INDEX" -r "$APP_DIR/requirements.txt"
+# 关键：必须配合 constraints.txt 钉住实测版本。不加 -c 会装到
+# agentscope 2.x / openai 3.x / mem0ai 2.x —— 从未验证过的组合。
+[ -f "$APP_DIR/constraints.txt" ] || fail "找不到 $APP_DIR/constraints.txt"
+sudo -u "$APP_USER" "$APP_DIR/.venv/bin/pip" install -q -i "$PIP_INDEX" \
+  -c "$APP_DIR/constraints.txt" -r "$APP_DIR/requirements.txt"
 info "依赖安装完成"
 
 step "5/6 .env"

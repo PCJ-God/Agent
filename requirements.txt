@@ -1,4 +1,9 @@
 # 智能教学助手 Agent 系统 - 依赖清单 (Hierarchical Mode)
+#
+# 注意：下面用的是松下限，直接 `pip install -r requirements.txt` 会解析到
+# agentscope 2.x / openai 3.x / mem0ai 2.x —— 那是一套从未验证过的组合。
+# 部署时请配合 constraints.txt（记录实测通过的版本）：
+#     pip install -r requirements.txt -c constraints.txt
 
 # ===== 核心框架 =====
 agentscope>=0.1.0
