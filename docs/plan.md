@@ -4,7 +4,8 @@
 > `docs/plan-review-archive.md`，其中的问题清单多已处理，**不要作为现状参考**。
 >
 > **记录范围**：用户体系与公网部署这一轮（认证、用户隔离、资源限制、Qdrant server 模式、
-> HTTPS 与反向代理）。行号与默认值以磁盘实际内容为准。
+> HTTPS 与反向代理），以及随后的**线上落地与域名接入**（腾讯云实例、真实 Let's Encrypt
+> 证书、前端致命 bug 修复）。行号与默认值以磁盘实际内容为准。
 >
 > 约定：每条改动给出「原因 + 验证证据」；**没有验证的会明确标注未验证**。
 
@@ -51,6 +52,31 @@
 | `MAX_TEAMS` | 20 | 进程内保留的团队实例上限，超出按 LRU 淘汰空闲的 |
 | `RATE_LIMIT_PER_MINUTE` | 20 | 每人每分钟对话请求上限 |
 | `LTM_SCOPE` | `session` | `session` 每任务独立 / `global` 跨任务累积 |
+
+### 2.3 线上部署实况（本轮新增，均为实测）
+
+**服务器**：腾讯云 CVM，Ubuntu 26.04 LTS，内核 7.0.0-30-generic，**2 核 / 1962 MB / 39 GB**
+（余 31 GB）。Python 3.14.4。与第五节「2 核 2G、40G 磁盘」的选型建议吻合。
+
+**访问入口**：
+
+| 入口 | 证书 | 说明 |
+|------|------|------|
+| `https://lovekiki.site` | Let's Encrypt，90 天（标准档案） | 正式入口；DNS A 记录指向本机 |
+| `https://www.lovekiki.site` | 同一张证书（SAN 含两个名字） | |
+| `https://139.155.146.41` | Let's Encrypt，6 天（`shortlived` 档案） | 备用；域名若被拦仍有退路 |
+
+所有入口的 HTTP 一律 301 到 `https://$host`。
+
+**IP 证书为什么只有 6 天**：Let's Encrypt 的 IP 证书走 `shortlived` 档案，有效期 6 天。
+所以**续期必须可靠** —— 已装 cron，并用 `certbot renew --dry-run` 验证通过。
+（6 天证书一旦续期失灵，HTTPS 六天后自己就死了。）域名证书是常规 90 天。
+
+**certbot 用 pip 装，不用 snap**：snapcraft 在大陆的访问和 GitHub 一样不可靠，
+改用 `python3 -m venv /opt/certbot` + 腾讯云 pip 镜像。
+
+**nginx 结构**：域名与纯 IP 各占一个 443 server 块（原因见 3.12），
+两块共用的部分抽到 `/etc/nginx/agent-locations.conf`。
 
 ---
 
@@ -157,6 +183,54 @@
 但 pydantic 模型 `SessionInfo` 还叫 `id`。**这是端到端验证抓出来的**，不是读代码发现的。
 修复：`SessionInfo.session_id` + 前端 `s.id` → `s.session_id`。
 
+### 3.10 前端发送按钮完全失效（顶层 TDZ 异常）
+
+`frontend/index.html` 里 `renderFooter()` 在 `mcpFooter` 的 `const` 声明**之前**被调用，
+而 `mcpFooter` 处于暂时性死区，该调用直接抛：
+
+```text
+ReferenceError: Cannot access 'mcpFooter' before initialization
+```
+
+它位于内联脚本的**顶层**，异常中断整个脚本 —— 于是后面的
+`sendBtn.addEventListener('click', sendMessage)` 与回车键监听**从未执行**。
+症状：输入框能打字（那是纯 HTML，不需要 JS），但点「发送」和按回车都毫无反应。
+
+修复：把 `renderFooter()` 移到元素 `const` 声明之后。
+
+**这个 bug 从部署那一刻就存在，与网络、与 CDN 都无关，任何环境下都一样坏。**
+
+### 3.11 systemd unit 的 `StartLimit*` 写错了分段
+
+`deploy/agent.service` 里 `StartLimitBurst` / `StartLimitIntervalSec` 原本写在 `[Service]`，
+systemd 在 journal 里报：
+
+```text
+Unknown key 'StartLimitIntervalSec' in section [Service], ignoring
+```
+
+这两个键属于 `[Unit]`。被静默忽略意味着「连续快速失败就放弃」这层保护**从未生效**，
+而读文件的人会以为它生效了。修复：移到 `[Unit]`。
+**是在 journal 里看到告警才发现的，不是读代码发现的。**
+
+### 3.12 Nginx 支持域名（域名与纯 IP 各占独立 443 server 块）
+
+拿到域名后签了域名证书，并调整 nginx 结构：
+
+| 文件 | 内容 |
+|------|------|
+| `deploy/nginx.conf` | 两个 443 server 块（域名块 / 纯 IP 块），证书随块走 |
+| `deploy/agent-locations.conf` | 新增：两块共用的 TLS 参数 + 超时 + location 转发 |
+
+**为什么必须拆成两个块**：nginx 按 `server_name`（SNI）选 server 块，证书是随块走的。
+在**同一个**块里写多个 `ssl_certificate` 并不能实现「按 SNI 选证书」—— 那个写法是给
+同一域名同时配 RSA 和 ECDSA 用的。实测把两张证书塞进一个块，域名访问也会拿到 IP 证书，
+浏览器报名称不匹配，**比不改还糟**。
+
+片段文件放 `/etc/nginx/agent-locations.conf`，**不能放 `conf.d/`**：
+那里被 `include /etc/nginx/conf.d/*.conf` 做 http 级包含，而 `location` 块
+只能出现在 `server` 块里，放进去 nginx 直接起不来。
+
 ---
 
 ## 四、验证记录
@@ -234,6 +308,52 @@ proxy_buffering on （nginx 默认）: 首帧 +15.31s / 总 24.39s → 63%   102
 - **LRU 淘汰只做了逻辑层面验证**，没在并发下压测。
 - **限流与 `MAX_TEAMS` 是进程内的**，多 worker 下每个 worker 各算一份 —— 见第七节。
 
+### 4.8 线上真机验收（真实 Let's Encrypt + 真实公网）
+
+在服务器上实跑，**客户端不关证书校验**（这是与 4.4/4.5 的关键区别：
+那两节用的是自签证书且关了校验，验的是配置结构，不是真实证书链）：
+
+```text
+https://lovekiki.site/             -> 200  text/html; charset=utf-8
+https://www.lovekiki.site/         -> 200
+https://lovekiki.site/api/sessions -> 401
+http://lovekiki.site/              -> 301  Location: https://lovekiki.site/
+https://139.155.146.41/health      -> 200
+
+按 SNI 取到的证书：
+  SNI=lovekiki.site      -> CN=lovekiki.site
+                            SAN: DNS:lovekiki.site, DNS:www.lovekiki.site
+  SNI=139.155.146.41     -> SAN: IP Address:139.155.146.41
+```
+
+### 4.9 SSE 经真实 nginx 的流式验收
+
+`POST /api/chat/stream` 经 nginx，逐事件打到达时间戳：
+
+```text
+[+  1.12s] data: {"type":"chunk","name":"Project Leader","text":"用户"}
+[+  2.13s] ...
+[+  9.94s] ...
+[+ 44.36s] data: {"type":"done","response":"..."}
+共 322 行, 总耗时 44.37s
+```
+
+事件从 1.12 秒一路铺到 44 秒 —— **时间戳递增本身就证明没有被缓冲**
+（若被缓冲，全部会挤在最后一刻）。`proxy_buffering off` 在真实链路上生效。
+
+### 4.10 前端脚本可执行性检查（可复现的回归手段）
+
+用 Node + 极简 DOM 桩执行 `frontend/index.html` 的内联脚本，捕获顶层异常：
+
+```text
+修复前: ReferenceError: Cannot access 'mcpFooter' before initialization
+修复后: 顶层执行完成，没有抛异常
+```
+
+**为什么需要这个手段**：HTTP 层返回 200 并不等于页面能用。3.10 那个 bug 在
+「`/health` 200、`/` 返回 24KB HTML、SSE 流式正常」的情况下，页面依然完全不可用。
+只验证 HTTP 层会漏掉这一类问题。
+
 ---
 
 ## 五、实测数据（服务器选型依据）
@@ -262,31 +382,47 @@ CPU 稳态几乎不吃（都在等 DashScope），吃 CPU 的是启动与团队�
 
 ---
 
-## 六、上线待办
+## 六、上线待办与完成情况
 
 ### 6.1 硬前提
 
-- [ ] **`QDRANT_URL`（仅多 worker 需要，不是上线前提）**：不配就只能是单进程；而单进程正是
-      这个应用的推荐形态（见第七节第 1 条），所以初次上线**可以先不配**，本地文件版 Qdrant 够用。
-- [ ] **`agentscope>=0.1.0` 下限过松**（`requirements.txt:4`）：代码用的是 AgentScope 1.x API，
-      全新服务器上 `pip install` 可能装出 0.x 直接跑不起来。建议收紧到 `>=1.0.0`。
+- [x] **`QDRANT_URL`**：本次上线**未配**，走本地文件模式。单进程正是这个应用的推荐形态
+      （见第七节第 1 条），所以初次上线可以先不配，本地文件版 Qdrant 够用。
+- [x] **`agentscope` 版本下限过松**：`requirements.txt` 的松下限（`>=0.1.0`）**没改**，
+      改为用 `constraints.txt` 钉死实测版本（`agentscope==1.0.18` 等），并在
+      `requirements.txt` 顶部写明必须配合 `-c constraints.txt` 安装。
 - [ ] **`cryptography` 不在依赖清单里**：`scripts/gen_self_signed_cert.py` 依赖它，目前只是
       恰好被其他包间接装上。要么加进 `requirements.txt`，要么接受该脚本只在已有环境可用。
+      **本轮复核**：服务器上装到的是 50.0.1，但 `requirements.txt` 与 `constraints.txt`
+      里都没有它 —— 仍在。线上用真实证书，该脚本用不到，影响可忽略，但**未修**。
 
 ### 6.2 上线必须补
 
-- [ ] **systemd unit**（Linux）：`Restart=always`、开机自启、日志进 journald、专用低权限用户。
+- [x] **systemd unit 已上线**：`Restart=always`、`enabled` + `active`、日志进 journald、
+      专用低权限用户 `agent`。
       **陷阱**：`src/config.py:9` 是 `load_dotenv()`（无参数，按当前工作目录找 `.env`），
       所以 `WorkingDirectory=` 必须写对，否则 `.env` 找不到、`check_api_key()` 直接启动失败。
-- [ ] **备份 `data/`**：里面是所有人的会话与长期记忆，丢了不可逆。
-- [ ] **HTTPS 生效**：按 `docs/DEPLOY.md` 的检查清单逐条过，重点是 `FORWARDED_ALLOW_IPS`
-      不要填 `*`。
+      （这个陷阱在线上被独立验证过一次：手动前台启动时若不在 `/opt/agent` 下跑，启动即失败。）
+      **期间修掉一个 bug**：`StartLimit*` 原本写在 `[Service]` 段被 systemd 静默忽略，见 3.11。
+- [ ] **备份 `data/` 未做**：里面是所有人的会话（`data/sessions.db`）与长期记忆
+      （`data/memory/`），丢了不可逆。**这仍是当前最该补的一条。**
+- [x] **HTTPS 已生效**：真实 Let's Encrypt 证书，域名 + 纯 IP 两个入口，续期 cron 已装并用
+      `--dry-run` 验证通过。`FORWARDED_ALLOW_IPS` 保持 `127.0.0.1`。验证见 4.8 / 4.9。
 
 ### 6.3 建议
 
-- [ ] 部署地区决策（大陆需 ICP 备案、延迟好；香港免备案、延迟与带宽差）
+- [x] **部署地区决策**：大陆腾讯云（成都），域名 `lovekiki.site` 已解析到本机。
+      **备案待确认**：域名解析到大陆服务器，未备案可能被按域名拦截；
+      因此保留了纯 IP 入口作为退路（见第七节第 6 条）。
 - [ ] Caddy 版配置实测（若决定用 Caddy）
 - [ ] `invoke_reviewer` 路径的运行时验证（承自归档文档 4.6，仍未覆盖）
+- [ ] **MCP 从未被真实触发**：`/health` 的 `mcp` 一直是 `initializing`，
+      两次真实对话都没有走联网搜索。**这条路完全没有验证。**
+- [ ] **前端依赖 jsdelivr CDN，大陆实测不通**：`frontend/index.html` 引用 5 个
+      `cdn.jsdelivr.net` 资源（katex / marked / DOMPurify）。大陆实测**5 个全部返回 `000`**
+      （0.22 秒被重置，curl 退出码 35）。代码有优雅降级，**不会崩**，
+      但消息会退化为**纯文本**：公式不排版、代码块不高亮。
+      修法是自托管这 5 个文件（注意：从大陆也下不了 jsdelivr，需走 npm 镜像）。
 
 ---
 
@@ -301,6 +437,10 @@ CPU 稳态几乎不吃（都在等 DashScope），吃 CPU 的是启动与团队�
    两层互补，不是替代。
 4. **无需配 CORS**：前端与 API 同源。除非将来把前端分域部署。
 5. **token 存 `localStorage`**：因此 HTTPS 不是可选项 —— 没有 HTTPS 就等于没有认证。
+6. **域名可用性不由本机决定。** 域名解析到大陆服务器，未备案可能被按域名拦截
+   （表现为域名突然不通，而纯 IP 仍正常）。故保留纯 IP 入口（独立 server 块 + IP 证书）
+   作为退路。但 IP 证书走 `shortlived` 档案**只有 6 天**，续期失灵 = HTTPS 六天后失效，
+   所以两个入口都依赖同一条续期 cron。
 
 ---
 
@@ -314,6 +454,19 @@ CPU 稳态几乎不吃（都在等 DashScope），吃 CPU 的是启动与团队�
    价值接近零（验的是别人的软件，且只在选 Caddy 时才有意义）。**该给判断的时候不要给菜单。**
 3. **测量脚本把 0.0 当成数据打印** —— `GetProcessMemoryInfo` 调用失败但没检查返回值，
    于是打印出一排 `0.0 MB`。修法是设对 `restype/argtypes` 并强制校验返回值。
+
+以下四条出自**线上落地与域名接入这一轮**：
+
+4. **把 nginx 的 `ssl_certificate` 当成可以按 SNI 选证书** —— 两张证书写进一个 server 块，
+   实测域名访问拿到了 IP 证书，比不改还糟（见 3.12）。**改完还误报了一次结论**（见下条）。
+5. **探针抢在 `systemctl reload` 前面跑，连报两次假故障** —— 一次是「http 该 301 却返回 200」，
+   一次是「两个 443 块也不生效」。两次都是 nginx 的旧 worker 还没换配置就接了请求。
+   **reload 之后必须等几秒再验，否则测的是旧配置，结论是假的。**
+6. **把「HTTP 200」当成「页面能用」** —— 声明前端「完整可用」时，只验证了 HTTP 层
+   （`/health` 200、`/` 返回 24KB HTML、SSE 流式正常），**从没在浏览器里执行过一行 JS**。
+   彼时页面完全不可用（3.10）。**验证必须覆盖到用户实际使用的那一层。**
+7. **在一份自查清单里列了不存在的文件名**（`src/access/ratelimit.py`）—— 限流其实写在
+   `server.py` 里，那个路径是我凭印象写的。**凡是写进脚本或文档的路径，先确认它存在。**
 
 ---
 
