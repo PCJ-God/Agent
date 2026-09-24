@@ -4,25 +4,60 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent 智能体系统 — Hierarchical</title>
-<!-- 数学公式样式 (KaTeX)，渲染脚本在页面底部引入 -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <style>
+  /*
+   * "夜读" — 研习空间
+   *
+   * 深靛蓝基底（不是终端黑），暖纸色文字（不是冷白），琥珀金 accent。
+   * 色彩有温度，排版有层级，留白让内容呼吸。
+   *
+   * 刻意回避：
+   *   - 纯黑/终端绿（那不是教学工具该有的气质）
+   *   - ALL-CAPS 标签、→ 链接后缀、同圆角卡片套件（技能文档列出的反模式）
+   *   - 动效泛滥：只有侧栏一次入场，其余只做 hover 微反馈
+   */
   :root {
-    --bg: #0c0c14;
-    --surface: #14141f;
-    --surface-hover: #1c1c2a;
-    --border: #2a2a3a;
-    --border-active: #4a9eff;
-    --text: #e0e0e8;
-    --text-muted: #7a7a90;
-    --accent: #4a9eff;
-    --green: #34d399;
-    --red: #f87171;
-    --amber: #f59e0b;
-    --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    --sans: 'Inter', -apple-system, sans-serif;
+    /* ── 基底 ── */
+    --bg:            #101123;
+    --surface:       #181934;
+    --surface-raised:#1f2042;
+    --surface-hover: #252550;
+    --border:        #2d2e58;
+    --border-light:  #36376a;
+
+    /* ── 文字 ── */
+    --text:          #e4dece;   /* 暖纸白，不是冷白 */
+    --text-emph:     #f0ebe0;
+    --text-muted:    #8b886e;   /* 暖灰，不是冷灰 */
+
+    /* ── accent ── */
+    --accent:        #c4a355;   /* 琥珀金 — 台灯下的书页 */
+    --accent-dim:    #9e8240;
+    --green:         #5f9475;   /* 鼠尾草绿 — 不是荧光绿 */
+    --red:           #c47f6e;   /* 暖调 — 不是猩红 */
+    --amber:         #c99e58;
+
+    /* ── 角色语义色 ── */
+    --role-leader:   #d4a95c;   /* 调度层：暖金 */
+    --role-exec:     #6ca392;   /* 执行层：青绿 */
+    --role-review:   #9d82b8;   /* 审查：柔和紫 */
+    --role-store:    #84806e;   /* 存储/元信息：暖灰 */
+
+    /* ── 字体 ── */
+    --serif:  'Georgia', 'Noto Serif SC', 'STSong', 'SimSun', serif;
+    --sans:   'Inter', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', -apple-system, sans-serif;
+    --mono:   'JetBrains Mono', 'Cascadia Code', 'SF Mono', 'Consolas', 'Courier New', monospace;
+
+    /* ── 空间 ── */
+    --radius-sm: 3px;
+    --radius:    6px;
+    --radius-lg: 10px;
+    --sidebar-w: 220px;
   }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
     font-family: var(--sans);
     background: var(--bg);
@@ -30,24 +65,39 @@
     height: 100vh;
     display: flex;
     overflow: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
+  /* ═══════════════════════════════════════════
+     侧栏
+     ═══════════════════════════════════════════ */
   .sidebar {
-    width: 260px;
+    width: var(--sidebar-w);
     background: var(--surface);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    /* 唯一一处入场动效：侧栏从左边淡入 */
+    animation: sidebar-in 0.5s ease-out;
   }
+  @keyframes sidebar-in {
+    from { opacity: 0; transform: translateX(-8px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar { animation: none; }
+  }
+
   .sidebar-header {
-    padding: 20px;
+    padding: 22px 18px 16px;
     border-bottom: 1px solid var(--border);
   }
   .sidebar-header h2 {
-    font-family: var(--mono);
-    font-size: 14px;
-    font-weight: 600;
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: var(--text-emph);
     margin-bottom: 4px;
   }
   .sidebar-header .status {
@@ -59,92 +109,133 @@
   }
   .sidebar-header .status::before {
     content: '';
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: var(--green);
   }
-  .arch-info {
-    padding: 16px;
-    border-bottom: 1px solid var(--border);
+
+  .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 10px 8px;
   }
-  .arch-layer {
-    padding: 8px 12px;
-    margin-bottom: 4px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: var(--mono);
-    border-left: 3px solid var(--border-active);
-    background: rgba(74,158,255,0.05);
-  }
-  .arch-layer .label { color: var(--accent); }
-  .arch-layer .desc { color: var(--text-muted); }
-  .sidebar-footer {
-    margin-top: auto;
-    padding: 12px;
-    border-top: 1px solid var(--border);
-    font-size: 11px;
+  .nav-item {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: left;
     color: var(--text-muted);
-    text-align: center;
+    font-family: var(--sans);
+    font-size: 13px;
+    transition: background 0.12s, color 0.12s;
+  }
+  .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+  .nav-item[aria-current="true"] {
+    background: var(--surface-raised);
+    color: var(--text);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .nav-item .k {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--role-store);
   }
 
+  .nav-hint {
+    padding: 8px 18px 14px;
+    font-size: 11px;
+    line-height: 1.75;
+    color: var(--text-muted);
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 10.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* ═══════════════════════════════════════════
+     主区
+     ═══════════════════════════════════════════ */
   .main {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
   }
+
   .topbar {
-    padding: 12px 20px;
+    padding: 10px 18px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 10px;
   }
   .topbar .current-wf {
-    font-family: var(--mono);
+    font-family: var(--serif);
     font-size: 13px;
-    font-weight: 600;
-  }
-  .topbar .mcp-status {
-    font-size: 11px;
-    color: var(--text-muted);
-    font-family: var(--mono);
+    font-weight: 400;
+    color: var(--text-emph);
+    margin-right: auto;
   }
   .icon-btn {
-    background: none;
+    background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    padding: 6px 10px;
-    border-radius: 4px;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     font-size: 12px;
-    font-family: var(--mono);
-    transition: all 0.15s;
+    font-family: var(--sans);
+    transition: border-color 0.12s, color 0.12s;
   }
-  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
 
   .task-select {
-    background: none;
+    background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text-muted);
     padding: 5px 8px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     font-size: 12px;
     font-family: var(--mono);
     max-width: 240px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: border-color 0.12s;
   }
-  .task-select:hover { border-color: var(--accent); color: var(--accent); }
-  .task-select option { background: #16161a; color: #e6e6e6; }
-  .task-empty { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+  .task-select:hover { border-color: var(--accent-dim); }
+  .task-select option { background: #16162e; color: var(--text); }
 
+  /* ═══════════════════════════════════════════
+     对话区
+     ═══════════════════════════════════════════ */
   .chat-area {
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
+    padding: 28px;
+    /* 消息居中的宽度约束 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
+  /* 消息内的滚动容器 */
+  .chat-scroll {
+    width: 100%;
+    max-width: 680px;
+  }
+
   .welcome {
     display: flex;
     flex-direction: column;
@@ -153,101 +244,149 @@
     height: 100%;
     text-align: center;
     color: var(--text-muted);
+    max-width: 440px;
+    margin: 0 auto;
   }
   .welcome h1 {
-    font-family: var(--mono);
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 8px;
+    font-family: var(--serif);
+    font-size: 21px;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    color: var(--text-emph);
+    margin-bottom: 10px;
   }
-  .welcome p { font-size: 13px; max-width: 420px; line-height: 1.6; }
+  .welcome p {
+    font-size: 13px;
+    line-height: 1.8;
+  }
 
-  .msg { margin-bottom: 20px; max-width: 720px; margin-left: auto; margin-right: auto; }
+  /* ── 消息气泡 ── */
+  .msg {
+    margin-bottom: 18px;
+    max-width: 680px;
+    width: 100%;
+  }
   .msg-role {
-    font-family: var(--mono);
     font-size: 11px;
     margin-bottom: 4px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-weight: 500;
+    letter-spacing: 0.02em;
   }
-  .msg-role.user { color: var(--amber); }
-  .msg-role.agent { color: var(--accent); }
-  .msg-role.user .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
-  .msg-role.agent .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .msg-role .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  /* 用户说话和 agent 说话的视觉差异：不靠换底色，靠 dot + label 字体 */
+  .msg-role.user .dot { background: var(--amber); }
+  .msg-role.agent .dot { background: var(--accent-dim); }
+
   .msg-body {
     font-size: 14px;
-    line-height: 1.7;
+    line-height: 1.8;
     white-space: pre-wrap;
     word-break: break-word;
+    color: var(--text);
   }
-  .msg-body.thinking { color: var(--text-muted); font-style: italic; font-size: 12px; }
+  .msg-body.thinking {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 12.5px;
+  }
 
-  /* Agent 输出经 marked 渲染后的排版 */
+  /* ── Markdown 渲染后的排版 ── */
   .msg-body.rich { white-space: normal; }
   .msg-body.rich > :first-child { margin-top: 0; }
   .msg-body.rich > :last-child { margin-bottom: 0; }
   .msg-body.rich h1, .msg-body.rich h2, .msg-body.rich h3,
   .msg-body.rich h4, .msg-body.rich h5, .msg-body.rich h6 {
-    margin: 18px 0 8px;
-    line-height: 1.4;
+    margin: 20px 0 8px;
+    line-height: 1.35;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-emph);
+    font-family: var(--serif);
   }
-  .msg-body.rich h1 { font-size: 19px; }
+  .msg-body.rich h1 { font-size: 19px; letter-spacing: 0.02em; }
   .msg-body.rich h2 { font-size: 17px; }
   .msg-body.rich h3 { font-size: 15.5px; }
-  .msg-body.rich h4 { font-size: 14.5px; }
-  .msg-body.rich h5, .msg-body.rich h6 { font-size: 14px; }
+  .msg-body.rich h4, .msg-body.rich h5, .msg-body.rich h6 { font-size: 14.5px; font-family: var(--sans); }
   .msg-body.rich p { margin: 8px 0; }
-  .msg-body.rich ul, .msg-body.rich ol { margin: 8px 0; padding-left: 26px; }
-  .msg-body.rich li { margin: 4px 0; }
-  .msg-body.rich li > ul, .msg-body.rich li > ol { margin: 4px 0; }
-  .msg-body.rich strong { color: #fff; font-weight: 600; }
-  .msg-body.rich a { color: var(--accent); }
+  .msg-body.rich ul, .msg-body.rich ol { margin: 8px 0; padding-left: 24px; }
+  .msg-body.rich li { margin: 3px 0; }
+  .msg-body.rich li > ul, .msg-body.rich li > ol { margin: 3px 0; }
+  .msg-body.rich strong { color: var(--text-emph); font-weight: 600; }
+  .msg-body.rich a { color: var(--accent); text-decoration: none; }
+  .msg-body.rich a:hover { text-decoration: underline; }
   .msg-body.rich code {
     font-family: var(--mono);
     font-size: 12.5px;
-    background: var(--bg);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
   }
   .msg-body.rich pre {
-    background: var(--bg);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: var(--radius);
+    padding: 14px;
     overflow-x: auto;
     margin: 10px 0;
+    line-height: 1.55;
   }
-  .msg-body.rich pre code { background: none; border: none; padding: 0; }
+  .msg-body.rich pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12px;
+  }
   .msg-body.rich blockquote {
-    border-left: 3px solid var(--border-active);
+    border-left: 3px solid var(--accent-dim);
     padding-left: 12px;
-    margin: 8px 0;
+    margin: 10px 0;
     color: var(--text-muted);
+    font-style: italic;
   }
-  .msg-body.rich table { border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  .msg-body.rich table {
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 13px;
+    width: 100%;
+  }
   .msg-body.rich th, .msg-body.rich td {
     border: 1px solid var(--border);
-    padding: 5px 10px;
+    padding: 6px 10px;
     text-align: left;
   }
-  .msg-body.rich th { background: var(--surface-hover); font-weight: 600; }
-  .msg-body.rich hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
-  /* 块级公式可能很宽，允许横向滚动而不是把气泡撑破 */
+  .msg-body.rich th {
+    background: var(--surface-hover);
+    font-weight: 600;
+    color: var(--text-emph);
+  }
+  .msg-body.rich hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   .msg-body.rich .katex-display { margin: 10px 0; overflow-x: auto; overflow-y: hidden; }
   .msg-body.rich .katex { font-size: 1.02em; }
 
+  /* ═══════════════════════════════════════════
+     输入区
+     ═══════════════════════════════════════════ */
   .input-area {
-    padding: 16px 24px;
+    padding: 14px 24px 18px;
     border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: center;
+  }
+  .input-wrap {
+    width: 100%;
+    max-width: 680px;
   }
   .input-box {
-    max-width: 720px;
-    margin: 0 auto;
     display: flex;
     gap: 8px;
   }
@@ -255,8 +394,8 @@
     flex: 1;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: var(--radius);
+    padding: 11px 14px;
     font-family: var(--sans);
     font-size: 14px;
     color: var(--text);
@@ -265,50 +404,57 @@
     min-height: 44px;
     max-height: 120px;
     transition: border-color 0.15s;
+    line-height: 1.55;
   }
-  .input-box textarea:focus { border-color: var(--accent); }
+  .input-box textarea::placeholder { color: var(--text-muted); }
+  .input-box textarea:focus { border-color: var(--accent-dim); }
   .send-btn {
-    padding: 0 20px;
+    padding: 0 22px;
     background: var(--accent);
     border: none;
-    border-radius: 6px;
-    color: #fff;
-    font-family: var(--mono);
+    border-radius: var(--radius);
+    color: var(--bg);
+    font-family: var(--sans);
     font-size: 13px;
     cursor: pointer;
     font-weight: 600;
     transition: background 0.15s;
+    align-self: flex-end;
   }
-  .send-btn:hover { background: #3a8eef; }
-  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .send-btn:hover { background: var(--accent-dim); }
+  .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
   .input-hint {
-    max-width: 720px;
-    margin: 8px auto 0;
-    font-size: 11px;
+    margin-top: 6px;
+    font-size: 10.5px;
     color: var(--text-muted);
     font-family: var(--mono);
+    text-align: right;
   }
-  @media (max-width: 768px) { .sidebar { display: none; } }
 
-  /* ── 账号面板 ── */
+  /* ═══════════════════════════════════════════
+     账号面板
+     —— 必须高于抽屉（z-index: 60 / 61），
+        否则「打开抽屉 → 想点登录」会被遮罩挡住。
+     ═══════════════════════════════════════════ */
   .acct-mask {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 40;
+    background: rgba(8, 8, 20, 0.65);
+    z-index: 60;
   }
   .acct-panel {
     position: fixed;
-    z-index: 41;
+    z-index: 61;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: min(92vw, 380px);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 18px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    background: var(--surface-raised);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
   }
   .acct-head {
     display: flex;
@@ -316,7 +462,8 @@
     justify-content: space-between;
     font-size: 14px;
     font-weight: 600;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+    color: var(--text-emph);
   }
   .acct-close {
     background: none;
@@ -329,10 +476,11 @@
   .acct-close:hover { color: var(--text); }
   .acct-note {
     font-size: 12px;
-    line-height: 1.7;
+    line-height: 1.75;
     color: var(--text-muted);
     margin-bottom: 14px;
   }
+  .acct-note b { color: var(--text-emph); font-weight: 600; }
   .acct-field { display: block; margin-bottom: 10px; }
   .acct-field span {
     display: block;
@@ -342,39 +490,43 @@
   }
   .acct-field input {
     width: 100%;
-    padding: 9px 10px;
-    background: var(--bg);
+    padding: 9px 12px;
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     color: var(--text);
     font-size: 13px;
     font-family: inherit;
   }
-  .acct-field input:focus { outline: none; border-color: var(--accent); }
+  .acct-field input:focus { outline: none; border-color: var(--accent-dim); }
   .acct-primary {
     width: 100%;
     padding: 10px;
     cursor: pointer;
     background: var(--accent);
     border: none;
-    border-radius: 8px;
-    color: #fff;
+    border-radius: var(--radius);
+    color: var(--bg);
     font-size: 13px;
     font-family: inherit;
+    font-weight: 600;
+    transition: background 0.12s;
   }
-  .acct-primary:disabled { opacity: 0.6; cursor: default; }
+  .acct-primary:disabled { opacity: 0.5; cursor: default; }
+  .acct-primary:hover:not(:disabled) { background: var(--accent-dim); }
   .acct-danger {
     width: 100%;
     padding: 10px;
     cursor: pointer;
     background: none;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius);
     color: var(--red);
     font-size: 13px;
     font-family: inherit;
+    transition: border-color 0.12s, background 0.12s;
   }
-  .acct-danger:hover { border-color: var(--red); }
+  .acct-danger:hover { border-color: var(--red); background: rgba(196,127,110,0.08); }
   .acct-link {
     display: block;
     width: 100%;
@@ -391,201 +543,311 @@
   .acct-msg {
     margin-top: 12px;
     font-size: 12px;
-    line-height: 1.6;
+    line-height: 1.65;
     color: var(--text-muted);
     word-break: break-word;
   }
-  /* ── 导航 + 抽屉（扩展功能）──────────────────────────────
-     设计取向：这是「一台正在协作的机器的控制台」，不是聊天工具。
-     所以：
-       · 侧栏从静态架构说明改成**真导航**（那四行说明原本占着最贵的位置）
-       · 新功能用**抽屉**而不是新页面 —— 管工具时不该丢掉对话上下文
-       · 角色色是**有语义的**（这条信息是谁产出的），不是装饰
-       · 空状态是"邀请行动"，报错说清发生了什么、怎么修，不空泛
-     ──────────────────────────────────────────────────────── */
-  :root {
-    --role-leader: #e0a458;   /* 调度层：Leader */
-    --role-exec: #6fb3a8;     /* 执行层：Researcher */
-    --role-review: #b48ead;   /* 审查：Reviewer */
-    --role-store: #7d8590;    /* 存储层 / 元信息 */
-  }
 
-  .nav { display: flex; flex-direction: column; gap: 2px; padding: 10px; }
-  .nav-item {
-    display: flex; align-items: baseline; gap: 10px;
-    width: 100%; padding: 9px 10px;
-    background: none; border: none; border-radius: 6px;
-    cursor: pointer; text-align: left;
-    color: var(--text-muted);
-    font-family: var(--sans); font-size: 13px;
-  }
-  .nav-item:hover { background: var(--surface-hover); color: var(--text); }
-  .nav-item[aria-current="true"] {
-    background: var(--surface-hover); color: var(--text);
-    box-shadow: inset 2px 0 0 var(--accent);
-  }
-  .nav-item .k { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--role-store); }
-  .nav-hint {
-    padding: 2px 20px 12px;
-    font-size: 11px; line-height: 1.7; color: var(--text-muted);
-  }
-  .role-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; }
-  .role-dot.leader { background: var(--role-leader); }
-  .role-dot.exec   { background: var(--role-exec); }
-  .role-dot.review { background: var(--role-review); }
-
-  /* ── 抽屉 ── */
+  /* ═══════════════════════════════════════════
+     抽屉（技能 / MCP）
+     —— 窄抽屉 + 醒目关闭按钮 + 底部返回链接
+     ═══════════════════════════════════════════ */
   .drawer-mask {
-    position: fixed; inset: 0; z-index: 50;
-    background: rgba(0, 0, 0, 0.5);
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(8, 8, 20, 0.55);
+    cursor: pointer;   /* 暗示点击遮罩可关闭 */
   }
   .drawer {
-    position: fixed; z-index: 51; top: 0; right: 0; bottom: 0;
-    width: min(94vw, 460px);
-    display: flex; flex-direction: column;
+    position: fixed;
+    z-index: 51;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(92vw, 340px);
+    display: flex;
+    flex-direction: column;
     background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-shadow: -20px 0 50px rgba(0, 0, 0, 0.45);
-    animation: drawer-in 0.18s ease-out;
+    border-left: 1px solid var(--border-light);
+    box-shadow: -8px 0 28px rgba(0, 0, 0, 0.5);
+    animation: drawer-in 0.14s ease-out;
+    cursor: default;   /* 抽屉内部恢复默认光标 */
   }
-  @keyframes drawer-in { from { transform: translateX(14px); opacity: 0.4; } }
-  @media (prefers-reduced-motion: reduce) {
-    .drawer { animation: none; }
+  /* 必须显式覆盖 hidden —— .drawer 的 display:flex 会吃掉浏览器默认的
+     [hidden] { display:none }，导致 closeDrawer 设了 hidden=true 但
+     抽屉依旧可见。加上 !important 确保 hidden 始终生效。 */
+  .drawer[hidden],
+  .drawer-mask[hidden] {
+    display: none !important;
   }
+  @keyframes drawer-in { from { transform: translateX(8px); opacity: 0.5; } }
+  @media (prefers-reduced-motion: reduce) { .drawer { animation: none; } }
+
   .drawer-head {
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-    padding: 18px 18px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px 12px;
     border-bottom: 1px solid var(--border);
   }
-  .drawer-head h2 { font-size: 15px; font-weight: 600; }
-  .drawer-sub { margin-top: 4px; font-size: 11px; line-height: 1.6; color: var(--text-muted); }
-  .x-btn {
-    background: none; border: none; cursor: pointer;
-    color: var(--text-muted); font-size: 20px; line-height: 1;
+  .drawer-head h2 {
+    font-family: var(--serif);
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: var(--text-emph);
+    margin: 0;
   }
-  .x-btn:hover { color: var(--text); }
-  .drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px 28px; }
+  .drawer-sub {
+    margin-top: 2px;
+    font-size: 10.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+  .drawer-close-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 12px;
+    white-space: nowrap;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .drawer-close-btn:hover { border-color: var(--accent-dim); color: var(--text); }
+  .drawer-close-btn .icon { font-size: 16px; line-height: 1; }
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px 20px;
+  }
+  /* 抽屉底部：固定在底部的返回链接 */
+  .drawer-foot {
+    padding: 10px 16px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .drawer-foot button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 11px;
+    text-decoration: underline;
+    padding: 0;
+  }
+  .drawer-foot button:hover { color: var(--text); }
 
   .sec-title {
-    display: flex; align-items: baseline; gap: 8px;
-    margin: 4px 0 10px;
-    font-size: 11px; color: var(--text-muted);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 6px 0 10px;
+    font-size: 11px;
+    color: var(--text-muted);
   }
-  .sec-title .n { font-family: var(--mono); color: var(--role-store); }
+  .sec-title .n {
+    font-family: var(--mono);
+    color: var(--role-store);
+    font-size: 10px;
+  }
   .sec-title.mine { margin-top: 22px; }
 
   .skill-card {
-    padding: 12px 13px; margin-bottom: 8px;
-    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
   }
-  .skill-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
-  .skill-card .slug { font-family: var(--mono); font-size: 10px; color: var(--role-exec); }
-  .skill-card .desc { margin-top: 6px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
-  .skill-card .acts { display: flex; gap: 12px; margin-top: 10px; font-size: 12px; }
+  .skill-card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    color: var(--text-emph);
+  }
+  .skill-card .slug {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--role-exec);
+  }
+  .skill-card .desc {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+  .skill-card .acts {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
+    font-size: 12px;
+  }
   .skill-card .acts button {
-    background: none; border: none; cursor: pointer; padding: 0;
-    color: var(--text-muted); font-family: inherit; font-size: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 11.5px;
     text-decoration: underline;
   }
   .skill-card .acts button:hover { color: var(--text); }
   .skill-card .acts button.danger:hover { color: var(--red); }
+
   .badge {
-    display: inline-block; margin-left: 6px; padding: 1px 6px;
-    border: 1px solid var(--border); border-radius: 999px;
-    font-size: 10px; color: var(--role-store);
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 9.5px;
+    color: var(--role-store);
+    vertical-align: middle;
   }
 
   .empty {
-    padding: 18px 14px;
-    border: 1px dashed var(--border); border-radius: 8px;
-    font-size: 12px; line-height: 1.8; color: var(--text-muted);
+    padding: 16px 14px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-muted);
   }
   .empty b { color: var(--text); font-weight: 600; }
 
   .field { display: block; margin-bottom: 10px; }
-  .field > span { display: block; margin-bottom: 4px; font-size: 11px; color: var(--text-muted); }
+  .field > span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
   .field .hint { color: var(--role-store); }
   .field input, .field textarea {
-    width: 100%; padding: 9px 10px;
-    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    color: var(--text); font-family: var(--sans); font-size: 13px;
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
   }
-  .field textarea { min-height: 150px; resize: vertical; font-family: var(--mono); font-size: 12px; line-height: 1.6; }
-  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+  .field textarea {
+    min-height: 150px;
+    resize: vertical;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.65;
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent-dim); }
 
   .row-btns { display: flex; gap: 8px; margin-top: 12px; }
   .btn-primary {
-    flex: 1; padding: 10px; cursor: pointer;
-    background: var(--accent); border: none; border-radius: 6px;
-    color: #fff; font-family: inherit; font-size: 13px;
+    flex: 1;
+    padding: 10px;
+    cursor: pointer;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    color: var(--bg);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.12s;
   }
-  .btn-primary:disabled { opacity: 0.6; cursor: default; }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-dim); }
   .btn-ghost {
-    padding: 10px 14px; cursor: pointer;
-    background: none; border: 1px solid var(--border); border-radius: 6px;
-    color: var(--text-muted); font-family: inherit; font-size: 13px;
+    padding: 10px 14px;
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 13px;
   }
-  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent-dim); }
 
-  .msgline { margin-top: 12px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+  .msgline { margin-top: 12px; font-size: 12px; line-height: 1.65; color: var(--text-muted); }
   .msgline.ok { color: var(--green); }
   .msgline.err { color: var(--red); }
+
+  /* ── 响应式 ── */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .chat-area { padding: 16px; }
+  }
 </style>
 </head>
 <body>
 
 <aside class="sidebar">
   <div class="sidebar-header">
-    <h2>Agent 系统</h2>
-    <div class="status">Hierarchical 层级协作</div>
+    <h2>智能教学助手</h2>
+    <div class="status">层级协作</div>
   </div>
-  <!-- 侧栏是真导航，不再是架构说明。角色点用语义色，后面消息气泡会复用同一套。 -->
   <nav class="nav">
     <button class="nav-item" id="navChat" aria-current="true">
-      <span class="role-dot exec"></span><span>对话</span>
+      <span>对话</span>
     </button>
     <button class="nav-item" id="navSkills" data-tab="skills">
-      <span class="role-dot leader"></span><span>技能</span>
+      <span>技能</span>
       <span class="k" id="navSkillsCount"></span>
     </button>
     <button class="nav-item" id="navMcp" data-tab="mcp">
-      <span class="role-dot review"></span><span>MCP 服务</span>
+      <span>MCP 服务</span>
       <span class="k" id="navMcpState"></span>
     </button>
   </nav>
   <div class="nav-hint">
-    技能是你能直接改的那一层：Agent 只按名字和描述判断该不该用，
-    决定要用时才会自己去读正文。
+    技能是你直接可改的一层：Agent 只看名字和描述，决定要用时才自己去读正文。
   </div>
   <div class="sidebar-footer" id="mcpFooter">MCP: 连接中...</div>
 </aside>
 
 <main class="main">
   <div class="topbar">
-    <span class="current-wf">Hierarchical 层级协作</span>
-    <select class="task-select" id="taskSelect" title="切换任务（会话）"></select>
+    <span class="current-wf">层级协作 · Hierarchical</span>
+    <select class="task-select" id="taskSelect" title="切换任务"></select>
     <button class="icon-btn" id="newTaskBtn">新建任务</button>
-    <button class="icon-btn" id="acctBtn" title="账号设置 / 登录">账号</button>
+    <button class="icon-btn" id="acctBtn" title="账号">账号</button>
   </div>
 
   <div class="chat-area" id="chatArea">
-    <div class="welcome">
-      <h1>Agent 智能体系统</h1>
-      <p>直接在下面提问。左侧「技能」可以把你自己的做法写成技能，Agent 需要时会自己去读。</p>
+    <div class="chat-scroll" id="chatScroll">
+      <div class="welcome">
+        <h1>智能教学助手</h1>
+        <p>直接在下面提问。左侧「技能」可以把你自己的做法写成技能，Agent 需要时会自己去读。</p>
+      </div>
     </div>
   </div>
 
   <div class="input-area">
-    <div class="input-box">
-      <textarea id="userInput" placeholder="输入你的问题..." rows="1"></textarea>
-      <button class="send-btn" id="sendBtn">发送</button>
+    <div class="input-wrap">
+      <div class="input-box">
+        <textarea id="userInput" placeholder="输入你的问题…" rows="1"></textarea>
+        <button class="send-btn" id="sendBtn">发送</button>
+      </div>
+      <div class="input-hint">Enter 发送  ·  Shift+Enter 换行</div>
     </div>
-    <div class="input-hint">Enter 发送 · Shift+Enter 换行</div>
   </div>
 </main>
 
-<!-- 账号面板：匿名账号在这里设置用户名密码（历史原地保留）；
-     已绑定账号可以退出当前设备，或用密码登录到另一个账号。 -->
+<!-- 账号面板 -->
 <div class="acct-mask" id="acctMask" hidden></div>
 <div class="acct-panel" id="acctPanel" hidden>
   <div class="acct-head">
@@ -596,7 +858,7 @@
   <div class="acct-msg" id="acctMsg"></div>
 </div>
 
-<!-- 扩展抽屉：技能管理（MCP 随后）。用抽屉而不是新页面 —— 管工具时不该丢掉对话上下文。 -->
+<!-- 扩展抽屉：技能 / MCP 管理 -->
 <div class="drawer-mask" id="drawerMask" hidden></div>
 <aside class="drawer" id="drawer" hidden>
   <div class="drawer-head">
@@ -604,12 +866,17 @@
       <h2 id="drawerTitle">技能</h2>
       <p class="drawer-sub" id="drawerSub"></p>
     </div>
-    <button class="x-btn" id="drawerClose" title="关闭">&times;</button>
+    <button class="drawer-close-btn" id="drawerCloseBtn" title="关闭抽屉 (Esc)">
+      <span class="icon">&times;</span> 关闭
+    </button>
   </div>
   <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot">
+    <button id="drawerReturnBtn">← 返回对话</button>
+    <span style="margin-left:12px">或按 Esc</span>
+  </div>
 </aside>
 
-<!-- 渲染依赖 (jsdelivr): Markdown / XSS 消毒 / LaTeX 公式 -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -622,22 +889,14 @@
     return 'web-' + Math.random().toString(36).slice(2, 10);
   }
 
-  // 任务 ID：每个标签页一个。用 sessionStorage 是为了刷新后仍是同一个任务，
-  // 而新标签页/新窗口则是新任务。后端再按 (用户, 任务) 两层隔离。
   let SESSION_ID = sessionStorage.getItem('agent_session_id');
   if (!SESSION_ID) {
     SESSION_ID = newSessionId();
     sessionStorage.setItem('agent_session_id', SESSION_ID);
   }
 
-  // 凭证：存在 localStorage（同浏览器共享，刷新/换标签页都还在）。
-  // 没有就先匿名注册（打开即用，不需要填任何东西）；之后可以绑定用户名密码，
-  // 或者用已有的用户名密码登录到别的账号。
   let TOKEN = localStorage.getItem('agent_token') || '';
   let USER_ID = localStorage.getItem('agent_user_id') || '';
-  // 账号信息（是否已绑定用户名密码）。**必须在 renderFooter() 第一次被调用之前
-  // 声明** —— renderFooter 会读它，而它是 let，声明写晚了就是又一次 TDZ 崩溃，
-  // 顶层异常会打断整个脚本，症状是「打字但发送没反应」。
   let ACCOUNT = { is_anonymous: true, username: null, user_id: USER_ID };
 
   async function register() {
@@ -654,7 +913,6 @@
     return d;
   }
 
-  // 统一请求入口：自动带凭证；token 失效（401）就重新注册再重试一次。
   async function api(path, opts = {}) {
     const o = Object.assign({}, opts);
     o.headers = Object.assign(
@@ -678,13 +936,9 @@
     mcpFooter.textContent = `MCP: ${mcpState}  |  用户: ${who}  |  任务: ${SESSION_ID}`;
     acctBtn.textContent = ACCOUNT.username || '账号';
   }
-  // 下面这些 const 必须先声明。mcpFooter 是 const，存在暂时性死区(TDZ)：
-  // 若在这之前调用 renderFooter()，会抛
-  //   "Cannot access 'mcpFooter' before initialization"
-  // 而这句位于内联脚本顶层 —— 异常会中断整个脚本，
-  // 导致后面的 sendBtn.addEventListener / Enter 键监听全部绑不上，
-  // 症状就是「在输入框里打字，但点发送和回车都没反应」。
+
   const chatArea = document.getElementById('chatArea');
+  const chatScroll = document.getElementById('chatScroll');
   const userInput = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
   const taskSelect = document.getElementById('taskSelect');
@@ -699,17 +953,13 @@
 
   renderFooter();
 
-  // 获取 MCP 状态
   api('/health').then(r => r.json()).then(d => {
     mcpState = d.mcp || '未知';
     renderFooter();
   }).catch(() => {});
 
   // ── 账号面板 ──
-  // 三个视图：anon（匿名 → 设置用户名密码）/ named（已绑定 → 退出或换号）
-  // / login（登录已有账号）。
   function acctDetail(d) {
-    // FastAPI 的错误体是 {"detail": "..."}；校验失败时 detail 是数组
     if (!d) return '请求失败';
     if (typeof d.detail === 'string') return d.detail;
     if (Array.isArray(d.detail)) {
@@ -744,8 +994,7 @@
 
     if (mode === 'anon') {
       acctBody.appendChild(acctNote(
-        '你现在是匿名账号 —— 打开即用，不需要注册。设置用户名和密码之后，'
-        + '就能在别的设备登录、看到同一份历史；已经产生的任务和历史都留在原处。'
+        '你现在是匿名账号 —— 打开即用，不需要注册。设置用户名和密码之后，就能在别的设备登录、看到同一份历史；已经产生的任务和历史都留在原处。'
       ));
       const u = acctField('用户名（3-32 位，字母/数字/下划线/点/横线）', 'text', 'username');
       const p = acctField('密码（至少 8 位）', 'password', 'new-password');
@@ -793,12 +1042,14 @@
     out.addEventListener('click', () => submitLogout(out));
     const other = document.createElement('button');
     other.className = 'acct-link';
-    other.textContent = '用另一个账号登录';
+    other.textContent = '登录到另一个账号';
     other.addEventListener('click', () => renderAccount('login'));
     acctBody.append(out, other);
   }
 
   function openAccount() {
+    // 先关掉抽屉：两者同时打开会互相遮挡
+    closeDrawer();
     renderAccount();
     acctPanel.hidden = false;
     acctMask.hidden = false;
@@ -809,8 +1060,6 @@
     acctMask.hidden = true;
   }
 
-  // 换账号：换凭证，清掉当前任务与聊天区，再载入新账号的任务列表。
-  // 不换 SESSION_ID 的话会把上一个账号的任务 ID 带到新账号名下。
   async function switchAccount(me) {
     TOKEN = me.token;
     USER_ID = me.user_id;
@@ -820,7 +1069,7 @@
     SESSION_ID = newSessionId();
     sessionStorage.setItem('agent_session_id', SESSION_ID);
 
-    chatArea.textContent = '';
+    chatScroll.textContent = '';
     const box = document.createElement('div');
     box.className = 'welcome';
     const h1 = document.createElement('h1');
@@ -828,7 +1077,7 @@
     const p = document.createElement('p');
     p.textContent = '下面是该账号已有的任务历史。';
     box.append(h1, p);
-    chatArea.appendChild(box);
+    chatScroll.appendChild(box);
 
     renderFooter();
     await refreshTaskList();
@@ -896,14 +1145,11 @@
         method: 'POST',
         headers: { Authorization: 'Bearer ' + TOKEN }
       });
-    } catch (e) {
-      // 网络失败也继续往下走：本地凭证照清，别卡在"看起来还登着"的状态
-    }
-    // 退出后回到匿名（新开一个匿名账号），这样不注册也能接着用
+    } catch (e) {}
     ACCOUNT = await register();
     SESSION_ID = newSessionId();
     sessionStorage.setItem('agent_session_id', SESSION_ID);
-    chatArea.textContent = '';
+    chatScroll.textContent = '';
     renderFooter();
     await refreshTaskList();
     renderAccount();
@@ -922,8 +1168,6 @@
     userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
   });
 
-  // 建立消息气泡，返回 { msg, body }。
-  // 一律用 textContent 写入，避免模型输出里的 HTML 被当作标记执行 (XSS)。
   function createMessage(label, { role = 'agent', thinking = false } = {}) {
     const msg = document.createElement('div');
     msg.className = 'msg';
@@ -935,7 +1179,7 @@
     const body = document.createElement('div');
     body.className = 'msg-body' + (thinking ? ' thinking' : '');
     msg.append(roleEl, body);
-    chatArea.appendChild(msg);
+    chatScroll.appendChild(msg);
     chatArea.scrollTop = chatArea.scrollHeight;
     return { msg, body };
   }
@@ -948,9 +1192,7 @@
     return msg;
   }
 
-  const BS = String.fromCharCode(92);   // 反斜杠
-  // 数学定界符: [开始, 结束, 是否块级]。用 BS 拼接而不是写反斜杠字面量，
-  // 避免源码里出现成片的 "\\[" "\\(" 转义。
+  const BS = String.fromCharCode(92);
   const MATH_DELIMS = [
     ['$$', '$$', true],
     [BS + '[', BS + ']', true],
@@ -962,9 +1204,6 @@
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  // 把数学片段摘出来换成占位符。
-  // 必须先摘: marked 会把 \{ \} \dots 当作 Markdown 转义吃掉，
-  // 公式里的花括号就画不出来了。
   function protectMath(text) {
     const spans = [];
     let out = '';
@@ -974,7 +1213,6 @@
       for (const d of MATH_DELIMS) {
         if (!text.startsWith(d[0], i)) continue;
         const end = text.indexOf(d[1], i + d[0].length);
-        // 行内公式限制长度，避免一个孤立的 $ 把大段正文吞进公式
         if (end === -1 || (!d[2] && end - i > 200)) continue;
         spans.push(text.slice(i, end + d[1].length));
         out += '@@MATH' + (spans.length - 1) + '@@';
@@ -987,13 +1225,9 @@
     return { text: out, spans };
   }
 
-  // Agent 输出是 Markdown + LaTeX。渲染管线:
-  //   1. 摘出数学片段 → 2. marked 渲染 Markdown → 3. DOMPurify 消毒
-  //   → 4. 还原公式 → 5. KaTeX 排版
-  // 第 3 步不能省: marked 会原样保留内联 HTML，直接 innerHTML 就是 XSS。
   function renderRich(el, raw) {
     if (typeof marked === 'undefined') {
-      el.textContent = raw;   // CDN 没加载成功时退化为纯文本
+      el.textContent = raw;
       return;
     }
     const { text, spans } = protectMath(raw);
@@ -1001,7 +1235,6 @@
     let html = marked.parse(text, { gfm: true, breaks: true });
     if (typeof DOMPurify !== 'undefined') html = DOMPurify.sanitize(html);
 
-    // 用 split 还原占位符（不用正则，省掉转义）
     const parts = html.split('@@MATH');
     if (parts.length > 1) {
       let restored = parts[0];
@@ -1036,7 +1269,7 @@
     const text = userInput.value.trim();
     if (!text || isRunning) return;
 
-    const welcome = chatArea.querySelector('.welcome');
+    const welcome = chatScroll.querySelector('.welcome');
     if (welcome) welcome.remove();
 
     addMessage('user', text);
@@ -1047,7 +1280,7 @@
     sendBtn.disabled = true;
 
     const thinkingEl = addMessage('agent', '思考中...', true);
-    const bubbles = new Map();   // 后端 msg.id -> 气泡
+    const bubbles = new Map();
 
     function renderNow(b) {
       if (b.timer) { clearTimeout(b.timer); b.timer = null; }
@@ -1056,7 +1289,6 @@
       chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    // 流式期间约每 120ms 才重排一次；每个字符都跑一遍 marked+KaTeX 会卡
     function renderSoon(b) {
       if (b.timer) return;
       b.timer = setTimeout(() => { b.timer = null; renderNow(b); }, 120);
@@ -1073,12 +1305,10 @@
           bubbles.set(ev.id, b);
         }
         b.text += ev.text;
-        // last=true 表示该条消息的最后一个分片，立刻出终版
         if (ev.last) renderNow(b); else renderSoon(b);
       } else if (ev.type === 'done') {
         if (thinkingEl.parentNode) thinkingEl.remove();
         bubbles.forEach(renderNow);
-        // 兜底：万一一个分片都没收到，就把最终答案直接渲染出来
         if (bubbles.size === 0 && ev.response) {
           const m = createMessage('Agent');
           renderRich(m.body, ev.response);
@@ -1101,7 +1331,6 @@
         throw new Error(detail.detail || ('HTTP ' + res.status));
       }
 
-      // 逐块读取 SSE 流：后端每产出一段文本就立刻渲染到对应气泡
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
@@ -1136,20 +1365,20 @@
   userInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
+
   // ── 任务（会话）与历史 ──
   const PAGE_SIZE = 20;
-  let historyCursor = null;      // 更早历史的游标；null = 已经到头
+  let historyCursor = null;
   let loadingOlder = false;
 
   function showWelcome() {
-    chatArea.innerHTML = `
+    chatScroll.innerHTML = `
       <div class="welcome">
-        <h1>Agent 智能体系统</h1>
+        <h1>智能教学助手</h1>
         <p>直接在下面提问。左侧「技能」可以把你自己的做法写成技能，Agent 需要时会自己去读。</p>
       </div>`;
   }
 
-  // 造一条对话气泡并追加到末尾，返回该元素
   function appendTurn(role, content) {
     const isUser = role === 'user';
     const { msg, body } = createMessage(isUser ? 'user' : 'Agent', {
@@ -1160,12 +1389,11 @@
     return msg;
   }
 
-  // 打开任务：取最新一页历史
   async function loadLatestPage() {
     try {
       const r = await api(`/api/sessions/${encodeURIComponent(SESSION_ID)}/messages?limit=${PAGE_SIZE}`);
       const d = await r.json();
-      chatArea.innerHTML = '';
+      chatScroll.innerHTML = '';
       if (!d.messages || d.messages.length === 0) {
         showWelcome();
       } else {
@@ -1173,10 +1401,9 @@
       }
       historyCursor = d.next_cursor;
       chatArea.scrollTop = chatArea.scrollHeight;
-    } catch (e) { /* 历史加载失败不阻塞继续对话 */ }
+    } catch (e) {}
   }
 
-  // 向上翻找历史：再取一页插到最前面，并把视口钉在原处
   async function loadOlderPage() {
     if (loadingOlder || historyCursor === null) return;
     loadingOlder = true;
@@ -1188,12 +1415,11 @@
         + `?limit=${PAGE_SIZE}&before=${before}`
       );
       const d = await r.json();
-      // appendTurn 会追加到末尾，所以创建完再倒序插到最前，恢复时间正序
       const els = (d.messages || []).map(m => appendTurn(m.role, m.content));
-      els.reverse().forEach(el => chatArea.prepend(el));
+      els.reverse().forEach(el => chatScroll.prepend(el));
       historyCursor = d.next_cursor;
       chatArea.scrollTop += chatArea.scrollHeight - prevHeight;
-    } catch (e) { /* 忽略 */ } finally {
+    } catch (e) {} finally {
       loadingOlder = false;
     }
   }
@@ -1219,7 +1445,7 @@
         taskSelect.appendChild(opt);
       });
       taskSelect.value = SESSION_ID;
-    } catch (e) { /* 忽略 */ }
+    } catch (e) {}
   }
 
   function switchTask(sessionId) {
@@ -1232,7 +1458,6 @@
   }
 
   taskSelect.addEventListener('change', () => switchTask(taskSelect.value));
-  // 上滑到顶 → 自动加载更早的一页
   chatArea.addEventListener('scroll', () => {
     if (chatArea.scrollTop < 40) loadOlderPage();
   });
@@ -1252,13 +1477,11 @@
     }
   });
 
-  // 启动：先确保有凭证，再列出任务、载入当前任务的历史
   (async () => {
     try {
       if (!TOKEN) {
         ACCOUNT = await register();
       } else {
-        // 已有 token：校验一次，失效就重新注册
         const r = await fetch('/api/auth/me', {
           headers: { Authorization: 'Bearer ' + TOKEN }
         });
@@ -1270,28 +1493,20 @@
           ACCOUNT = await register();
         }
       }
-    } catch (e) { /* 下面两个请求失败时也会暴露问题 */ }
+    } catch (e) {}
     renderFooter();
     await refreshTaskList();
     await loadLatestPage();
   })();
 
-  // ── 扩展抽屉：技能管理 ──────────────────────────────────────────────
-  // 追加在脚本末尾（启动 IIFE 之后）是刻意的：上面所有 const 都已初始化，
-  // 不会踩到前面注释里说的那种 TDZ 崩溃。
-  //
-  // 语义：技能存在服务端库里，磁盘上的 SKILL.md 只是给 Agent 读的物化视图。
-  // 增删改之后服务端会让该用户的缓存团队失效 → **下一次提问就生效**，
-  // 所以界面就这么写，别说成"要重启服务"。
-  //
-  // 注意 agent 只拿到名字和描述，正文要它自己调 read_skill_file 去读 ——
-  // 所以"描述"这一栏决定技能会不会被用上，值得写清楚。
+  // ── 扩展抽屉：技能管理 ──
   const drawer = document.getElementById('drawer');
   const drawerMask = document.getElementById('drawerMask');
   const drawerBody = document.getElementById('drawerBody');
   const drawerTitle = document.getElementById('drawerTitle');
   const drawerSub = document.getElementById('drawerSub');
-  const drawerClose = document.getElementById('drawerClose');
+  const drawerCloseBtn = document.getElementById('drawerCloseBtn');
+  const drawerReturnBtn = document.getElementById('drawerReturnBtn');
   const navChat = document.getElementById('navChat');
   const navSkills = document.getElementById('navSkills');
   const navMcp = document.getElementById('navMcp');
@@ -1313,7 +1528,6 @@
     return el('div', 'msgline' + (kind ? ' ' + kind : ''), text);
   }
 
-  // 侧栏高亮：抽屉关掉时回到"对话"，因为对话一直在后面
   function navSet(active) {
     [navChat, navSkills, navMcp].forEach((b) => {
       if (b) b.setAttribute('aria-current', b === active ? 'true' : 'false');
@@ -1385,8 +1599,7 @@
       empty.append(
         el('b', null, '还没有自定义技能。'),
         document.createTextNode(
-          '写下"什么时候该用、按什么步骤做"，比如你们团队的评审标准、简历的写法。' +
-            'Agent 需要时会自己读到它。'
+          '写下"什么时候该用、按什么步骤做"，比如你们团队的评审标准、简历的写法。Agent 需要时会自己读到它。'
         )
       );
       drawerBody.appendChild(empty);
@@ -1466,7 +1679,6 @@
             }),
           });
       if (!r.ok) {
-        // FastAPI 的校验错误 detail 是数组，得挑出 msg
         const d = await r.json().catch(() => ({}));
         const detail = Array.isArray(d.detail)
           ? d.detail.map((x) => x.msg || '').join('；')
@@ -1474,7 +1686,6 @@
         throw new Error(detail || 'HTTP ' + r.status);
       }
       await renderSkills();
-      // renderSkills 重建了列表，所以结果行重新插到最上面
       drawerBody.insertBefore(
         msgLine('已保存，下一次提问就会用上。', 'ok'),
         drawerBody.firstChild
@@ -1486,7 +1697,6 @@
     }
   }
 
-  // 两步确认，不用原生 confirm：它会打断页面，也没法把后果说清楚
   function confirmDelete(s, card) {
     const acts = card.querySelector('.acts');
     if (!acts) return;
@@ -1575,12 +1785,11 @@
       });
     }
 
-    // 把"为什么这里是只读的"讲清楚，而不是留一个没有下文的占位
     const note = el('div', 'empty');
     note.append(
       el('b', null, '这里是只读的：'),
       document.createTextNode(
-        '现在的 MCP 是服务端配置文件里写死的一个远程服务（' +
+        '现在的 MCP 服务是部署时配好的（' +
           (d.name ? d.name + '，' : '') +
           '地址和密钥都只在服务端）。要支持自己添加 MCP 服务器，得先定两件事：' +
           '谁能加（影响加到谁的账号下）、密钥存在哪里 —— 那等于允许 Agent ' +
@@ -1591,6 +1800,8 @@
   }
 
   function openDrawer(tab) {
+    // 先关掉账号面板：两者同时打开会互相遮挡
+    closeAccount();
     drawer.hidden = false;
     drawerMask.hidden = false;
     drawer.setAttribute('aria-hidden', 'false');
@@ -1611,7 +1822,7 @@
     drawer.hidden = true;
     drawerMask.hidden = true;
     drawer.setAttribute('aria-hidden', 'true');
-    navSet(navChat); // 关掉抽屉就是回到对话
+    navSet(navChat);
   }
 
   navChat.addEventListener('click', () => {
@@ -1620,14 +1831,14 @@
   });
   navSkills.addEventListener('click', () => openDrawer('skills'));
   navMcp.addEventListener('click', () => openDrawer('mcp'));
-  drawerClose.addEventListener('click', closeDrawer);
+  drawerCloseBtn.addEventListener('click', closeDrawer);
+  drawerReturnBtn.addEventListener('click', closeDrawer);
   drawerMask.addEventListener('click', closeDrawer);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !drawer.hidden) closeDrawer();
   });
   navSet(navChat);
 
-  // 侧栏顺带显示 MCP 状态（健康检查那条是启动时发的，这里再确认一次口径一致）
   api('/health')
     .then((r) => r.json())
     .then((d) => {
