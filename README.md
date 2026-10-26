@@ -32,6 +32,7 @@ docker compose up -d --build
 ```
 
 - 首次启动会构建 `gateway` / `ai-engine` 两个自建镜像并拉取基础设施镜像，约需数分钟。
+- 前端为 Vue 构建产物，仓库已含 `frontend/dist`；改动前端源码后重新构建：`cd frontend && npm install && npm run build`。
 - 之后日常启动/重启用 `docker compose up -d` 即可。
 
 ### 3. 检查状态
@@ -40,6 +41,8 @@ docker compose up -d --build
 docker compose ps                       # 12 个容器应全部 Up（mysql/rabbitmq/redis 为 healthy）
 curl http://localhost:8080/health       # 网关健康检查，返回 {"status":"ok"}
 ```
+
+浏览器打开 **http://localhost:8081** 即进入前端界面（登录后可对话、检索、上传文档）。
 
 ### 4. 冒烟验证（可选）
 
@@ -53,7 +56,7 @@ pwsh scripts/phase1_smoke.ps1           # 注册/登录/带 JWT 查 /me 全链�
 
 | 服务 | 地址 | 账号 | 说明 |
 | :--- | :--- | :--- | :--- |
-| Nginx（唯一对外入口） | http://localhost:8081 | — | 反代到网关 |
+| Nginx（前端 + API 入口） | http://localhost:8081 | — | 静态托管前端 + 反代 /api |
 | 网关 Gateway | http://localhost:8080 | — | 调试直连，携带 JWT |
 | AI 引擎 | http://localhost:8000 | — | 内部服务，一般不直连 |
 | Prometheus | http://localhost:9090 | — | 指标抓取 |

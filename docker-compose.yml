@@ -40,6 +40,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    volumes:
+      - ./ai-engine/data/docs:/app/data/docs   # 知识库文档：改动后调 /api/rag/ingest 即可，无需重建镜像
     environment:
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?DASHSCOPE_API_KEY must be set in .env}
       LLM_MODEL: ${LLM_MODEL:-qwen-plus}
@@ -204,6 +206,7 @@ services:
       - "8081:80"     # 宿主机 80 被系统 HTTP.sys 占用，改映射到 8081（本地无 TLS）
     volumes:
       - ./deploy/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - gateway
 
