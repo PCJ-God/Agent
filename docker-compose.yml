@@ -1,0 +1,217 @@
+# ACP Copilot — 全栈 Docker Compose
+#
+# 目标服务器：2 vCPU / 4 GiB / 50 GiB（整栈内存约 2.9 GiB，留约 1 GiB 余量）
+# 启动：docker compose up -d
+#
+# 说明：
+# 1. gateway / ai-engine 是自建镜像；两者 Dockerfile 均已落地，可直接 build。
+# 2. 基础设施全部用官方镜像；alpine 变体优先（体积小、攻击面小）。
+# 3. 版本策略：major.minor 锁大版本，首次 pull 后把每个镜像 pin 到精确 digest，
+#    保证可复现（README 里承诺过这一点）。
+# 4. 本地开发挂 deploy/nginx.dev.conf（HTTP，反代到 gateway）；生产用 deploy/nginx.conf
+#    （含 TLS / 域名 / IP 证书），上线时切回。
+
+services:
+  # ─────────────────── 接入层：Go 网关（自建） ───────────────────
+  gateway:
+    build: ./gateway                    # Phase 1：创建 gateway/Dockerfile
+    container_name: acp-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"                     # 调试用；正式入口走 nginx
+    environment:
+      GIN_MODE: release
+      MYSQL_DSN: "acp:${MYSQL_PASSWORD:-acp123}@tcp(mysql:3306)/acp?charset=utf8mb4&parseTime=True&loc=Local"
+      REDIS_ADDR: redis:6379
+      RABBITMQ_URL: "amqp://acp:${RABBITMQ_PASSWORD:-acp}@rabbitmq:5672/"
+      AI_ENGINE_URL: http://ai-engine:8000
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ─────────────────── AI 引擎层：Python（自建） ───────────────────
+  ai-engine:
+    build: ./ai-engine                  # Phase 2：创建 ai-engine/Dockerfile
+    container_name: acp-ai-engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?DASHSCOPE_API_KEY must be set in .env}
+      LLM_MODEL: ${LLM_MODEL:-qwen-plus}
+      VISION_MODEL: ${VISION_MODEL:-qwen-vl-plus}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-v4}
+      ENABLE_LONG_TERM_MEMORY: ${ENABLE_LONG_TERM_MEMORY:-true}
+      LTM_SCOPE: ${LTM_SCOPE:-session}
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      QDRANT_URL: http://qdrant:6333
+      REDIS_ADDR: redis:6379
+      RABBITMQ_URL: "amqp://acp:${RABBITMQ_PASSWORD:-acp}@rabbitmq:5672/"
+    depends_on:
+      chroma:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ─────────────────── AI 异步 worker（文档解析） ───────────────────
+  ai-worker:
+    build: ./ai-engine
+    container_name: acp-ai-worker
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?DASHSCOPE_API_KEY must be set in .env}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-v4}
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      RABBITMQ_URL: "amqp://acp:${RABBITMQ_PASSWORD:-acp}@rabbitmq:5672/"
+    depends_on:
+      chroma:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  # ─────────────────── 关系库：MySQL ───────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: acp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: acp
+      MYSQL_USER: acp
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-acp123}
+    ports:
+      - "3307:3306"   # 宿主机 3306 被本机 mysqld 占用，改映射到 3307
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────── 缓存 / 限流 / 短期记忆：Redis ───────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: acp-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────── 消息队列：RabbitMQ ───────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: acp-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: acp
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-acp}
+    ports:
+      - "5672:5672"                     # AMQP
+      - "15672:15672"                   # 管理台（调试/演示）
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────── RAG 向量库：Chroma ───────────────────
+  chroma:
+    image: chromadb/chroma:latest      # 首次 pull 后 pin 到精确版本
+    container_name: acp-chroma
+    restart: unless-stopped
+    ports:
+      - "8001:8000"                     # 容器默认 8000，主机避开 ai-engine 的 8000
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  # ─────────────────── 长期记忆向量库：Qdrant ───────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.9.0
+    container_name: acp-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"                     # REST
+      - "6334:6334"                     # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  # ─────────────────── 附件对象存储：MinIO ───────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: acp-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-acpadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-acpadmin123}
+    ports:
+      - "9000:9000"                     # S3 API
+      - "9001:9001"                     # 控制台
+    volumes:
+      - minio_data:/data
+
+  # ─────────────────── 监控：Prometheus + Grafana ───────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: acp-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - gateway
+      - ai-engine
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: acp-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  # ─────────────────── 反向代理（唯一对外入口）：Nginx ───────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: acp-nginx
+    restart: unless-stopped
+    ports:
+      - "8081:80"     # 宿主机 80 被系统 HTTP.sys 占用，改映射到 8081（本地无 TLS）
+    volumes:
+      - ./deploy/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gateway
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
+  chroma_data:
+  qdrant_data:
+  minio_data:
+  grafana_data:
