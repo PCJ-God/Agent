@@ -4,6 +4,70 @@
 
 本项目是一个基于大语言模型（LLM）与多智能体（Agent）架构的垂直领域学习助手。专为备考**阿里云 ACP 认证（云计算专业认证）**的学生设计。系统结合了本地私有知识库（RAG）与联网搜索兜底机制，并具备长短期记忆分离能力，能够像真实助教一样提供精准、及时、个性化的辅导。
 
+## ⚡ 快速启动 (Quick Start)
+
+### 0. 前置要求
+
+- Docker Desktop（含 Docker Compose v2）
+- 阿里云百炼平台的 [DashScope API Key](https://bailian.console.aliyun.com/)（模型调用 + 联网搜索 MCP 鉴权必需）
+
+### 1. 配置环境变量
+
+```bash
+cp .env.example .env    # Windows: copy .env.example .env
+```
+
+编辑 `.env`，至少填入：
+
+```ini
+DASHSCOPE_API_KEY=sk-你的真实Key
+```
+
+> `DASHSCOPE_API_KEY` 是唯一必填项，未设置时 `docker compose up` 会直接报错退出；其余变量（模型名、各类密码）均有默认值，可先不修改。
+
+### 2. 一键启动
+
+```bash
+docker compose up -d --build
+```
+
+- 首次启动会构建 `gateway` / `ai-engine` 两个自建镜像并拉取基础设施镜像，约需数分钟。
+- 之后日常启动/重启用 `docker compose up -d` 即可。
+
+### 3. 检查状态
+
+```bash
+docker compose ps                       # 12 个容器应全部 Up（mysql/rabbitmq/redis 为 healthy）
+curl http://localhost:8080/health       # 网关健康检查，返回 {"status":"ok"}
+```
+
+### 4. 冒烟验证（可选）
+
+```bash
+pwsh scripts/phase1_smoke.ps1           # 注册/登录/带 JWT 查 /me 全链路（需 PowerShell 7+）
+```
+
+`phase2` ~ `phase6` 分别验证对话、RAG、Agent、记忆、异步文档解析链路，可依次执行。
+
+### 端口速查
+
+| 服务 | 地址 | 账号 | 说明 |
+| :--- | :--- | :--- | :--- |
+| Nginx（唯一对外入口） | http://localhost:8081 | — | 反代到网关 |
+| 网关 Gateway | http://localhost:8080 | — | 调试直连，携带 JWT |
+| AI 引擎 | http://localhost:8000 | — | 内部服务，一般不直连 |
+| Prometheus | http://localhost:9090 | — | 指标抓取 |
+| Grafana | http://localhost:3000 | admin / admin | 监控面板 |
+| RabbitMQ 管理台 | http://localhost:15672 | acp / acp | 队列观测 |
+| MinIO 控制台 | http://localhost:9001 | acpadmin / acpadmin123 | 对象存储 |
+
+### 停止与清理
+
+```bash
+docker compose down        # 停止并移除容器（保留数据卷）
+docker compose down -v     # 连同数据卷一并删除（清空 MySQL/Redis/向量库等）
+```
+
 ## 🎯 核心痛点与解决方案 (Pain Points & Solutions)
 
 1. **知识更新极快，本地库易过时**
