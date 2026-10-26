@@ -1,210 +1,115 @@
-# Agent 智能教学助手 — 层级协作模式
+# 🎓 ACP Copilot: 专为阿里云认证打造的学习助手
 
-基于 [AgentScope](https://github.com/modelscope/agentscope) 的多 Agent 层级协作系统，采用四层架构设计。
+## 📖 项目简介 (Introduction)
 
-> 当前项目依赖 DashScope API 与远程 MCP（DashScope 联网搜索）。
+本项目是一个基于大语言模型（LLM）与多智能体（Agent）架构的垂直领域学习助手。专为备考**阿里云 ACP 认证（云计算专业认证）**的学生设计。系统结合了本地私有知识库（RAG）与联网搜索兜底机制，并具备长短期记忆分离能力，能够像真实助教一样提供精准、及时、个性化的辅导。
 
-## 四层架构
+## 🎯 核心痛点与解决方案 (Pain Points & Solutions)
 
-```
-┌─────────────┐
-│  接入层      │  CLI / FastAPI — 处理用户输入
-├─────────────┤
-│  调度层      │  Leader Agent — 任务拆解、优先级排序、调度
-├─────────────┤
-│  执行层      │  Researcher + Reviewer + MCP 工具 + Skill
-├─────────────┤
-│  存储层      │  Mem0/Qdrant 长期记忆
-└─────────────┘
-```
+1. **知识更新极快，本地库易过时**
+   * **方案**：采用 **Agentic RAG** 架构。优先检索本地 ACP 官方文档（Chroma 向量库）；若本地未命中，Agent 自动触发 **Function Calling** 调用联网搜索工具（DashScope MCP 的 `bailian_web_search`），获取最新网页信息，保证回答的时效性。
+2. **大模型缺乏记忆，无法因材施教**
+   * **方案**：长短记忆分离机制。
+     * **短期记忆**：基于 Redis List 的**滑动窗口**，利用 LLM 对早期对话进行**摘要压缩（Summary Memory）**，解决上下文窗口（Context Window）爆炸和截断失忆问题。
+     * **长期记忆**：基于 Mem0 中间件，跨会话自动提炼并向量化存储用户画像（如：零基础、易错点、目标考试时间）。
+3. **提问形式单一，交互体验差**
+   * **方案**：支持多模态附件上传。图片/PDF/日志文件存入 OSS/MinIO 对象存储，数据库仅存 URL 和元数据，并在前端与消息流绑定渲染。
 
-| 层级 | 位置 | 职责 |
-|------|------|------|
-| 接入层 | `src/access/` | CLI 交互、FastAPI REST API、Web 前端 |
-| 调度层 | `src/orchestration/` | Leader 拆解任务、分配优先级、协调执行 |
-| 执行层 | `src/execution/` | ReAct Agent、MCP 工具注册、Skill 加载 |
-| 存储层 | `src/storage/` | 向量化长期记忆 (Mem0+Qdrant) |
+---
 
-## 环境要求
+## 🏗️ 系统架构设计 (Architecture)
 
-- Python 3.10+
-- DashScope API Key
-
-## 安装与配置
-
-```bash
-conda create -n agent_learn python=3.10
-conda activate agent_learn
-pip install -r requirements.txt
-```
-
-复制环境变量模板并填写 API Key：
-
-```bash
-copy .env.example .env       # Windows
-# cp .env.example .env       # macOS/Linux
-```
-
-至少配置：
-
-```dotenv
-DASHSCOPE_API_KEY=你的_DashScope_API_Key
-```
-
-常用环境变量：
-
-| 变量 | 默认值 | 用途 |
-|------|--------|------|
-| `DASHSCOPE_API_KEY` | 无 | DashScope 模型和远程 MCP 鉴权 |
-| `LLM_MODEL` | `qwen-plus` | 使用的聊天模型 |
-| `MAX_REACT_ITERS` | `10` | ReAct 最大循环次数 |
-| `MCP_SERVER_URL` | DashScope WebSearch | 远程 MCP 服务地址 |
-| `ENABLE_LONG_TERM_MEMORY` | `true` | 是否启用 Mem0 + Qdrant 长期记忆 |
-| `LTM_SCOPE` | `session` | 长期记忆作用域: `session` 会话间隔离 / `global` 跨会话累积 |
-
-## 运行方式
-
-### CLI 交互式对话
-
-```bash
-python scripts/run_agent.py --interactive
-```
-
-### CLI 单次提问
-
-```bash
-python scripts/run_agent.py --question "帮我搜集 Transformer 的教学资料"
-```
-
-输入 `quit` 或 `exit` 退出交互模式。
-
-### FastAPI + 前端
-
-```bash
-python scripts/run_server.py
-```
-
-打开 <http://127.0.0.1:8000>。
-
-请求示例：
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/chat ^
-  -H "Content-Type: application/json" ^
-  -d "{\"message\":\"找到 Attention Is All You Need 这篇论文\"}"
-```
-
-## 用户、会话（任务）与记忆
-
-两层隔离：**用户** 和 **任务**。一个用户可以有多个任务，任务之间完全隔离；
-不同用户之间在任何层面都不共享东西。
-
-| 层面 | 隔离方式 |
-|------|----------|
-| 用户 | `users` 表 + uuid token；除 `/health` 外所有接口都要 `Authorization: Bearer <token>` |
-| 短期记忆 | 每个 (用户, 任务) 一个 `HierarchicalTeam`，各自一份 `InMemoryMemory` |
-| 长期记忆 | user_id → Mem0 的 `user_id`，任务 ID → `run_id`（`LTM_SCOPE=session` 时），两者都是检索过滤条件 |
-| 对话历史 | 按 (user_id, session_id) 存进 SQLite（`data/sessions.db`），进程重启也不丢 |
-| 并发 | 锁按 (用户, 任务) 分 —— 都能并行推进，只在同一任务内串行 |
-
-重新打开一个任务时，会把它最近 `HISTORY_REPLAY_TURNS` 轮对话回放进 Leader 的记忆，
-所以它是「接着聊」；历史也可以在界面上分页往前翻。
-
-### 认证
-
-两种用法：**匿名**（打开即用，什么都不用填）和**具名**（用户名 + 密码，可跨设备）。
-
-```bash
-# 1. 匿名：直接拿一个 token
-curl -X POST http://127.0.0.1:8000/api/auth/register \
-     -H "Content-Type: application/json" -d '{"name":""}'
-# → {"user_id":"...","token":"...","name":"","created_at":"...",
-#    "username":null,"is_anonymous":true}
-
-# 2. 具名：注册时就带上用户名密码（也可以先匿名，之后再把凭据绑上去）
-curl -X POST http://127.0.0.1:8000/api/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"username":"alice","password":"at-least-8-chars"}'
-
-# 3. 之后所有请求带上 token
-curl http://127.0.0.1:8000/api/sessions -H "Authorization: Bearer <token>"
-```
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `POST` | `/api/auth/register` | 不带 `username`/`password` → 匿名账号；带了 → 具名账号（重名 409） |
-| `POST` | `/api/auth/login` | 用户名 + 密码换一个**新** token（支持多设备并存） |
-| `POST` | `/api/auth/bind` | 给**当前匿名账号**补上用户名密码，已有历史原地保留 |
-| `POST` | `/api/auth/logout` | 吊销**当前** token（其他设备不受影响，账号和历史都还在） |
-| `GET` | `/api/auth/me` | 校验 token，返回当前用户（含 `username` / `is_anonymous`） |
-
-密码用标准库 `hashlib.scrypt` 哈希（内存硬，不引入新依赖），存储格式自描述，
-将来换算法只需按前缀分派校验逻辑。用户名不区分大小写；登录失败按用户名做
-窗口限流（见 `server.py` 的 `_LOGIN_WINDOW` / `_LOGIN_MAX_FAILS`）。
-
-**为什么要「绑定凭据」而不是「新建账号」**：`user_id` 是数据归属的唯一依据
-（会话、消息、长期记忆都按它隔离），所以注册的本质是给当前这个 `user_id`
-补一组「能再次证明身份」的凭据 —— 历史不用搬，天然就在原地。
-
-token 仍是「一票通行」的凭证：**只在 HTTPS 下暴露**，要吊销用
-`POST /api/auth/logout`（`session_store.revoke_token`）。
-
-### 任务接口
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/api/sessions` | 列出**当前用户**的任务（最近活跃的在前） |
-| `POST` | `/api/sessions` | 新建任务，body 可带 `session_id` / `title` |
-| `DELETE` | `/api/sessions/{id}` | 删除任务及其历史 |
-| `GET` | `/api/sessions/{id}/messages?limit=20&before=<游标>` | 分页读取对话历史 |
-
-`messages` 按时间正序返回；`next_cursor` 是下次往前翻要传的 `before`，为 `null` 表示已经到头。
-
-### 资源隔离（公网必看）
-
-| 配置 | 默认 | 作用 |
-|------|------|------|
-| `QDRANT_URL` | 空 | **线上必须设** —— 本地文件版是单进程独占的，多 worker 会抢锁失败 |
-| `MAX_SESSIONS_PER_USER` | 50 | 每人任务数上限，超出返回 429 |
-| `MAX_TEAMS` | 20 | 进程内保留的任务实例上限，超出按 LRU 淘汰空闲的（历史仍在 SQLite，下次访问重建） |
-| `RATE_LIMIT_PER_MINUTE` | 20 | 每人每分钟对话请求上限，超出返回 429 |
-
-### 怎么用
-
-- **CLI**：`python scripts/run_agent.py -i --session taskA --user alice`（默认 `cli-default` / `local`）
-- **HTTP**：带 `Authorization` 头，请求体里带 `session_id`
-- **网页端**：首次打开自动建一个匿名账号并存下 token（打开即用，不用填任何东西）；顶栏「账号」按钮可以设置用户名密码（之后在别的设备登录能看到同一份历史）、退出登录或用另一个账号登录；「任务」下拉框切换任务、「新建任务」开新任务；向上滚动自动加载更早的历史
-
-## 项目结构
+系统采用 **“Go 业务底座 + Python AI 引擎”** 的混合微服务架构，实现算力隔离与高并发解耦：
 
 ```text
-Agent/
-├── frontend/                 # 原生 HTML 前端
-├── scripts/                  # CLI、Server 入口
-├── skills/                   # SKILL.md 技能定义
-└── src/
-    ├── config.py             # 全局配置 + 日志
-    ├── access/               # 接入层
-    │   ├── cli.py            # CLI 核心逻辑
-    │   └── server.py         # FastAPI 核心逻辑
-    ├── orchestration/        # 调度层
-    │   └── hierarchical.py   # Leader-Worker 层级调度
-    ├── execution/            # 执行层
-    │   ├── agents/           # ReAct Agent + 工厂
-    │   └── tools/            # MCP 工具池 + Skill 分发
-    └── storage/              # 存储层
-        └── memory/           # 长期记忆 (Mem0 + Qdrant)
+[前端 (Vue/React/小程序)]
+   │  (HTTP/SSE流式返回, 携带 JWT 和 附件URL)
+   ▼
+[接入层 (Go - Gin)] ─── (Redis 限流 / JWT 鉴权 / 附件存储 MinIO)
+   │
+   ▼  (gRPC / HTTP)
+[业务与持久化层 (Go)] 
+   ├── 业务逻辑：MySQL (User, Session, Message, Agent, Attachment)
+   ├── 快速缓存：Redis (接口限流、Token配额)
+   └── 消息队列：RabbitMQ (异步文档解析、记忆摘要)
+   │
+   ▼  (HTTP)
+[AI 引擎层 (Python - AgentScope)]
+   ├── RAG 引擎：Chroma (ACP 文档向量检索) + LlamaIndex 管线
+   ├── 工具生态：Web Search Tool (DashScope MCP 联网兜底)
+   ├── 短期记忆：RedisMemory (滑动窗口 + 摘要压缩)
+   └── 长期记忆：Mem0 (自动提炼用户画像，向量存 Qdrant)
 ```
 
-## 工作流说明
+**为什么消息队列选 RabbitMQ 而不是 Kafka**：本项目的异步负载是「文档解析 / 记忆摘要」这类低频任务队列——要求可靠投递、失败重试、死信队列，而非 Kafka 擅长的高吞吐事件流。RabbitMQ 更轻、更对口；Redis 仅承担缓存 / 限流 / 短期记忆，不兼任队列。
 
-系统只保留 **层级协作 (Hierarchical)** 模式：
+## 🔍 RAG 检索管线设计 (RAG Pipeline)
 
-1. **Leader (调度层)** 接收用户请求，拆解为子任务
-2. **Researcher (执行层)** 搜集整理资料
-3. **Reviewer (执行层)** 审查质量并给出改进建议
-4. Leader 汇总结果，交付最终输出
+RAG 是「本地知识库 + 联网兜底」中本地检索的核心，采用 7 环节管线：
 
-## 学习资料
+```text
+文档摄入 → 索引 → 检索 → 生成 → 记忆 → 安全护栏 → 评测
+```
 
-项目内容参考 [阿里云大模型 ACP 认证课程](https://edu.aliyun.com/course/3130200)。
+| 环节 | 模块职责 | 关键设计 |
+| :--- | :--- | :--- |
+| 文档摄入 | 加载 ACP 官方 Markdown，结构感知分块 | 按标题层级切块，写入 `header_path` 溯源元数据 |
+| 索引 | 向量化并写入 Chroma | Embedding 抽象，后端可切换 |
+| 检索 | 意图识别 → 改写/指代消解 → 拆解 → 混合召回 → 重排 | 语义 + 标签两路召回，两阶段检索（qwen3-rerank 精排） |
+| 生成 | 拼上下文 → 调 LLM → 带引用回答 | 强制只用资料回答，引用编号可溯源 |
+| 记忆 | 多轮对话记忆（改写、指代消解） | 滑动窗口 + 语义召回 |
+| 安全护栏 | 输入/输出双向内容审核 | fail-open 保证主链路可用 |
+| 评测 | Ragas 跑 QA 对 | 忠实度 / 正确性 / 召回率 / 精确率 |
+
+两条质量红线（来自真实踩坑经验）：
+
+1. **引用程序化校验**：生成时返回「编号 → 文档块」映射，生成后校验回答里的 `[i]` 是否属于本次实际注入的块，越界判不可信，不靠 prompt 许愿。
+2. **结构感知分块要实测**：切片后必须验证每块的 `header_path` 元数据真的存在，避免「溯源字段形同虚设」。
+
+**与 Agent 的集成方式**：整条 RAG 管线作为自包含模块，以**工具**形式暴露给 AgentScope Agent——Agent 判断是「知识题」时调 RAG 工具（本地 Chroma 检索，带引用），本地未命中或知识过时时调 MCP 联网搜索，这正是「Agentic RAG」的实现路径。
+
+## 🧠 记忆机制深度设计 (Memory Design)
+
+为了平衡大模型的“算力成本”与“记忆连贯性”，我们设计了如下机制：
+
+* **短期记忆（RedisMemory）**：
+    * 按 `session_id` 隔离，数据按 JSON 格式存在 Redis List 中。
+    * **滑动窗口**：仅保留最近 N 轮对话。
+    * **摘要压缩**：当 Token 超出阈值，后台通过 RabbitMQ 异步拉起任务，将最早的 10 条消息交由 LLM 生成摘要，用摘要替换原文，节省 Token。
+* **长期记忆（Mem0）**：
+    * 采用 `Mem0Middleware` 中间件形式挂载。
+    * 利用复用的 LLM 自动抽取对话中关于用户的“事实与偏好”。
+    * 在 `on_reply` 钩子中自动检索（注入 Prompt）与写回（存入向量库）。
+
+## 🗄️ 数据库与存储设计 (Storage)
+
+本系统严格遵循**“各司其职”**的存储原则，拒绝把 MySQL 当垃圾桶：
+
+| 组件 | 存储内容 | 职责说明 |
+| :--- | :--- | :--- |
+| **MySQL** | `User`, `Agent`, `Session`, `Message`, `Attachment` | 核心业务元数据，关系型强一致性存储（GORM 软删除、索引） |
+| **Redis** | 短期记忆、JWT黑名单、限流计数器 | 极高并发读写缓存（无状态下的快速状态共享） |
+| **RabbitMQ** | 异步任务队列（文档解析、记忆摘要） | 可靠投递（ack + 重试 + 死信队列），削峰填谷、系统解耦 |
+| **OSS/MinIO** | 用户上传的图片、PDF附件文件 | 物理大文件存储（MySQL仅存文件URL） |
+| **Chroma** | 本地 ACP 文档切片 | RAG 语义检索（高维向量数据） |
+| **Qdrant** | Mem0 提取的长期记忆 | 用户画像语义检索 |
+
+*注：核心业务表结构已预留 `source`（回答来源：local/web/mixed）和 `search_query`（联网搜索词）字段，方便后续做模型评测与数据追踪。*
+
+## 🛠️ 技术栈 (Tech Stack)
+
+* **后端基座**：Go (Gin, GORM), gRPC
+* **AI 引擎**：Python (FastAPI), AgentScope (ReAct 规划), LlamaIndex (RAG 管线), Mem0
+* **数据存储**：MySQL, Redis, RabbitMQ, Chroma, Qdrant
+* **大模型接入**：阿里云通义千问 (Qwen) / 智谱 GLM
+* **工程化与运维**：Docker Compose, MinIO, Prometheus, Grafana
+
+## 🚀 开发路线图 (Roadmap)
+
+- [ ] **Phase 1: 基础架构搭建** (Go + Gin + MySQL + JWT + FastAPI)
+- [ ] **Phase 2: 纯文本对话链路跑通** (Python 接入通义千问)
+- [ ] **Phase 3: RAG 知识库检索** (Chroma + 文档摄入/索引/检索管线)
+- [ ] **Phase 4: Agent 引入与工具调用** (AgentScope + RAG 工具 + Web Search 兜底)
+- [ ] **Phase 5: 记忆机制深度集成** (RedisMemory + Mem0 Middleware)
+- [ ] **Phase 6: 异步与文件处理** (RabbitMQ 异步解析文档 + OSS/MinIO)
+- [ ] **Phase 7: 工程化与监控** (Docker Compose 部署 + Prometheus 监控埋点)
