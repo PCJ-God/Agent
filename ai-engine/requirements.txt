@@ -1,9 +1,31 @@
 # ACP Copilot AI 引擎 — 依赖清单
-# 后续阶段追加：agentscope / mem0ai 等，
-# 并配合 constraints.txt 钉死实测版本（沿用现有项目做法）。
+# 精确版本由 constraints.txt 钉死（首次构建后生成）。
 fastapi>=0.110
 uvicorn>=0.29
 httpx>=0.27
-chromadb>=0.5.0
 redis>=5.0.0
 pika>=1.3.0
+
+# RAG：LlamaIndex + Qdrant（多路召回 + RRF + rerank）
+llama-index==0.14.25
+llama-index-vector-stores-qdrant==0.10.4
+llama-index-retrievers-bm25==0.8.0
+llama-index-postprocessor-dashscope-rerank==0.6.0
+qdrant-client>=1.12
+jieba>=0.42
+
+# Agent + 记忆
+agentscope==1.0.21
+mem0ai==2.2.1
+# agentscope 1.0.21 的上游打包漏声明：mcp 需 <2.0（2.x 改了 API），greenlet/tqdm 缺失
+mcp<2.0
+greenlet>=3.0
+tqdm>=4.66
+
+# gRPC（桩代码由 grpcio-tools 生成，运行时仅需 grpcio + protobuf）
+grpcio>=1.81.1
+protobuf>=6.33.5
+
+# 文档解析 + OCR
+pymupdf>=1.24
+python-docx>=1.1

@@ -1,31 +1,42 @@
-"""AI 引擎配置：从环境变量读取（由 docker-compose 注入）。"""
+"""AI 引擎配置：从环境变量读取（docker-compose 注入）。"""
 import os
 
+# DashScope 模型
 DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus")
-
-# DashScope 的 OpenAI 兼容接口（与现有项目 model.py 一致）
 DASHSCOPE_CHAT_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-
-# RAG：向量化与向量库
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v4")
 EMBEDDING_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
-CHROMA_HOST = os.getenv("CHROMA_HOST", "chroma")
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
-CHROMA_URL = os.getenv("CHROMA_URL", f"http://{CHROMA_HOST}:{CHROMA_PORT}")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v4")
+
+# RAG：向量库（Qdrant）+ 重排
+RAG_COLLECTION = os.getenv("RAG_COLLECTION", "acp_docs")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+RERANK_ENABLED = os.getenv("RERANK_ENABLED", "true").lower() == "true"
+RERANK_MODEL = os.getenv("RERANK_MODEL", "gte-rerank")
 DOCS_DIR = os.getenv("DOCS_DIR", "/app/data/docs")
 
-# Agent：联网搜索（DashScope MCP，无状态 streamable HTTP）
+# 记忆：mem0 长期记忆（agent_control 模式）
+MEMORY_EMBED_DIM = int(os.getenv("MEMORY_EMBED_DIM", "2048"))
+MEMORY_COLLECTION = os.getenv("MEMORY_COLLECTION", "mem0")
+
+# Agent
 MCP_SERVER_URL = os.getenv(
     "MCP_SERVER_URL", "https://dashscope.aliyuncs.com/api/v1/mcps/WebSearch/mcp"
 )
-MAX_AGENT_ITERS = int(os.getenv("MAX_AGENT_ITERS", "5"))
+MAX_AGENT_ITERS = int(os.getenv("MAX_AGENT_ITERS", "8"))
 
-# 记忆：短期（Redis 滑动窗口）+ 长期（Qdrant 用户画像）
+# Redis：文档解析结果缓存（worker 写、ai-engine 读）
 REDIS_ADDR = os.getenv("REDIS_ADDR", "redis:6379")
-QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
-MEMORY_WINDOW = int(os.getenv("MEMORY_WINDOW", "20"))
-MEMORY_SUMMARY_KEEP = int(os.getenv("MEMORY_SUMMARY_KEEP", "6"))
+PARSE_RESULT_TTL = int(os.getenv("PARSE_RESULT_TTL", "1800"))
+
+# 上传限制
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
+MAX_FILES = int(os.getenv("MAX_FILES", "5"))
+MAX_TOTAL_MB = int(os.getenv("MAX_TOTAL_MB", "30"))
+MAX_TEXT_CHARS = int(os.getenv("MAX_TEXT_CHARS", "30000"))
+
+# OCR：照片 / 扫描件（DashScope 视觉 OCR）
+OCR_MODEL = os.getenv("OCR_MODEL", "qwen-vl-ocr")
 
 # 异步：文档解析队列
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://acp:acp@rabbitmq:5672/")

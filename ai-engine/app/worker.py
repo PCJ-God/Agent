@@ -1,17 +1,23 @@
-"""异步文档解析 worker（Phase 6）。
+"""异步文档解析 worker。
 
-消费 RabbitMQ 的 doc_parse 队列：下载上传的文件 -> 解析文本 -> 分块向量化 -> 写入 Chroma。
-用 `python -m app.worker` 启动（独立于 uvicorn 进程，见 docker-compose ai-worker 服务）。
+消费 RabbitMQ `doc_parse` 队列：
+- 下载 MinIO 文件 → 问题理解层解析（docx/pdf/OCR）
+- task_type=chat：解析结果写 Redis（ai-engine 按 task_id 读取）
+- task_type=ingest：额外调 gRPC IngestText 写入知识库
+用 `python -m app.worker` 启动（独立进程，见 docker-compose ai-worker 服务）。
 """
 import json
 import logging
 import time
 
+import grpc
 import httpx
 import pika
+import redis
 
-from app import rag
-from app.config import RABBITMQ_URL
+from app import understanding
+from app.config import PARSE_RESULT_TTL, RABBITMQ_URL, REDIS_ADDR
+from gen import assistant_pb2, assistant_pb2_grpc
 
 QUEUE = "doc_parse"
 
@@ -19,28 +25,47 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger("worker")
 
 
-def parse_text(filename: str, content: bytes) -> str:
-    lower = filename.lower()
-    if lower.endswith((".md", ".txt", ".json", ".csv", ".log")):
-        return content.decode("utf-8", errors="ignore")
-    return None  # 不支持的类型
+def _redis() -> redis.Redis:
+    return redis.Redis.from_url(REDIS_ADDR, decode_responses=True)
+
+
+def _set_result(task_id: str, status: str, text: str = "") -> None:
+    r = _redis()
+    r.set(f"parse:status:{task_id}", status, ex=PARSE_RESULT_TTL)
+    if text:
+        r.set(f"parse:{task_id}", text, ex=PARSE_RESULT_TTL)
+
+
+def _ingest_to_kb(name: str, text: str, source: str) -> int:
+    channel = grpc.insecure_channel("ai-engine:50051")
+    try:
+        stub = assistant_pb2_grpc.AssistantServiceStub(channel)
+        resp = stub.IngestText(
+            assistant_pb2.IngestTextRequest(name=name, text=text, source=source)
+        )
+        return resp.ingested
+    finally:
+        channel.close()
 
 
 def handle(ch, method, _properties, body):
     msg = json.loads(body)
-    object_key = msg["object_key"]
+    task_id = msg.get("task_id", "")
     filename = msg.get("filename", "upload")
+    task_type = msg.get("task_type", "chat")
+    object_key = msg.get("object_key", "")
     try:
         resp = httpx.get(msg["download_url"], timeout=60)
         resp.raise_for_status()
-        text = parse_text(filename, resp.content)
-        if text is None:
-            logger.warning("跳过不支持的类型: %s", filename)
-        else:
-            result = rag.ingest_text(object_key, text, source=filename)
-            logger.info("摄入 %s -> %s", filename, result)
+        text, meta = understanding.parse(filename, resp.content)
+        _set_result(task_id, "done", text)
+        logger.info("解析完成 %s（%s，%d 字符）", filename, meta["type"], len(text))
+        if task_type == "ingest":
+            n = _ingest_to_kb(object_key, text, source=filename)
+            logger.info("入库 %s -> %d 切片", filename, n)
     except Exception as exc:
         logger.error("解析失败 %s: %s", object_key, exc)
+        _set_result(task_id, "error", str(exc))
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

@@ -2,6 +2,9 @@
 .deep-copilot/
 .vscode/
 
+# Local scratch（临时 venv、冒烟输出等，不进版本控制）
+_scratch/
+
 # Environment files and local secrets
 .env
 .env.*
