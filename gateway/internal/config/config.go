@@ -15,6 +15,7 @@ type Config struct {
 	RabbitMQURL    string
 	AIGRPCAddr     string
 	JWTSecret      string
+	FeishuAdapterToken string
 	TokenTTL       time.Duration
 	RateLimitPerDay int64
 	AdminUsername  string
@@ -36,6 +37,7 @@ func Load() *Config {
 		RabbitMQURL:    getenv("RABBITMQ_URL", "amqp://acp:acp@127.0.0.1:5672/"),
 		AIGRPCAddr:     getenv("AI_GRPC_ADDR", "ai-engine:50051"),
 		JWTSecret:      getenv("JWT_SECRET", "dev-secret-change-me"),
+		FeishuAdapterToken: getenv("FEISHU_ADAPTER_TOKEN", ""),
 		TokenTTL:       24 * time.Hour,
 		RateLimitPerDay: int64(getenvInt("RATE_LIMIT_PER_DAY", 20)),
 		AdminUsername:  getenv("ADMIN_USERNAME", "admin"),

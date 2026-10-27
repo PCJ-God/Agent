@@ -1,0 +1,3 @@
+# ACP Copilot — feishu-adapter 依赖
+lark-oapi>=1.0.0
+httpx>=0.27

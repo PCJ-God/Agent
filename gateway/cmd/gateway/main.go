@@ -69,7 +69,7 @@ func main() {
 		MaxTotalMB:  cfg.MaxTotalMB,
 	}
 
-	r := api.NewRouter(h, cfg.JWTSecret)
+	r := api.NewRouter(h, cfg.JWTSecret, cfg.FeishuAdapterToken)
 	log.Printf("gateway 监听 :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("启动失败: %v", err)

@@ -48,10 +48,21 @@ func AdminOnly() gin.HandlerFunc {
 	}
 }
 
-// RateLimitMiddleware 每日固定窗口限流（按 user_id）。
+// InternalTokenMiddleware 校验服务间调用（feishu-adapter 调网关内部端点）。
+func InternalTokenMiddleware(token string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if token == "" || c.GetHeader("X-Internal-Token") != token {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// RateLimitMiddleware 每日固定窗口限流（按 user_id）；管理员免限流。
 func RateLimitMiddleware(rl *RateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if rl == nil {
+		if rl == nil || c.GetString("role") == "admin" {
 			c.Next()
 			return
 		}

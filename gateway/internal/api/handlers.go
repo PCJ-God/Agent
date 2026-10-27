@@ -342,3 +342,102 @@ func (h *Handler) ParseStatus(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"statuses": statuses})
 }
+
+// ─────────────────────── 飞书绑定 ───────────────────────
+
+const feishuBindTTL = 5 * time.Minute
+
+// FeishuBindCode 内部接口：feishu-adapter 为用户生成一次性绑定码，存 Redis。
+func (h *Handler) FeishuBindCode(c *gin.Context) {
+	var req struct {
+		OpenID string `json:"open_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	code := uuid.NewString()[:6]
+	if h.Redis != nil {
+		h.Redis.Set(c.Request.Context(), "feishu_bind:"+code, req.OpenID, feishuBindTTL)
+	}
+	c.JSON(http.StatusOK, gin.H{"code": code})
+}
+
+// FeishuToken 内部接口：按 open_id 找到绑定的用户并签发 JWT（飞书用户以该 JWT 走 /api/assistant）。
+func (h *Handler) FeishuToken(c *gin.Context) {
+	var req struct {
+		OpenID string `json:"open_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var user models.User
+	if err := h.DB.Where("feishu_open_id = ?", req.OpenID).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not bound"})
+		return
+	}
+	token, _, err := auth.GenerateToken(h.JWTSecret, user.ID, user.Role, h.TokenTTL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue token"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
+}
+
+// BindFeishu Web 端：用户登录后提交绑定码，完成 open_id 与当前账号的绑定。
+func (h *Handler) BindFeishu(c *gin.Context) {
+	var req struct {
+		Code string `json:"code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userID := c.GetUint("userID")
+
+	openID := ""
+	if h.Redis != nil {
+		openID, _ = h.Redis.Get(c.Request.Context(), "feishu_bind:"+req.Code).Result()
+	}
+	if openID == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "绑定码无效或已过期"})
+		return
+	}
+
+	var other models.User
+	if err := h.DB.Where("feishu_open_id = ? AND id <> ?", openID, userID).First(&other).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "该飞书账号已绑定其他用户"})
+		return
+	}
+
+	if err := h.DB.Model(&models.User{}).Where("id = ?", userID).UpdateColumn("feishu_open_id", openID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if h.Redis != nil {
+		h.Redis.Del(c.Request.Context(), "feishu_bind:"+req.Code)
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// FeishuBindStatus Web 端：查询当前账号是否已绑定飞书。
+func (h *Handler) FeishuBindStatus(c *gin.Context) {
+	userID := c.GetUint("userID")
+	var user models.User
+	if err := h.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"bound": user.FeishuOpenID != ""})
+}
+
+// UnbindFeishu Web 端：解除当前账号的飞书绑定。
+func (h *Handler) UnbindFeishu(c *gin.Context) {
+	userID := c.GetUint("userID")
+	if err := h.DB.Model(&models.User{}).Where("id = ?", userID).UpdateColumn("feishu_open_id", "").Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}

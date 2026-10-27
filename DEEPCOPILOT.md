@@ -4,7 +4,7 @@
 
 ## 项目速览
 
-- 类型：阿里云 ACP 学习助手，Go（网关）+ Python（AI 引擎）混合架构，Docker Compose 编排（11 个服务）。
+- 类型：阿里云 ACP 学习助手，Go（网关）+ Python（AI 引擎）混合架构，Docker Compose 编排（12 个服务，含飞书适配器）。
 - 唯一对外入口：nginx `:8081`；调试直连网关 `:8080`；AI 引擎 `:8000`（HTTP）/ `:50051`（gRPC）。
 - 应用默认管理员：`admin / admin123456`（网关首次启动自动种子创建）。
 
@@ -53,6 +53,14 @@ curl -N -X POST http://127.0.0.1:8081/api/assistant -H "Authorization: Bearer $T
   -d '{"message":"什么是RAG？","session_id":"s1","task_ids":[]}'
 ```
 
+## 飞书接入（feishu-adapter）
+
+- 定位：飞书是新前端/新渠道，**不改 AI 链路**。feishu-adapter 用 lark-oapi 长连接收消息，再以「网关签发的 JWT」调 `/api/assistant`，行为与 Web 前端一致。
+- 绑定模型：飞书用户必须先有 Web 账号再绑定（验证码）。流程：飞书 @机器人「绑定」→ 网关生成 6 位码（Redis，5 分钟）→ Web 端「飞书绑定」页输入 → 写 `users.feishu_open_id`。未绑定用户提问时回复引导去 Web 注册。
+- 身份映射：单聊 `session_id=chat_id`、`user_id=open_id`（长期记忆按人）；群聊仅 @机器人 响应。适配器按 open_id 调网关内部端点 `/api/internal/feishu/token` 换 JWT，内部端点用 `X-Internal-Token`（= `FEISHU_ADAPTER_TOKEN`）鉴权。
+- 卡片流式：`/api/assistant` 的 SSE 事件里 step→卡片工具轨迹、delta→累积正文，节流 300ms patch 一次（Feishu patch 是整卡替换）。
+- 坑：lark-oapi 长连接用模块级 asyncio 事件循环，事件回调是同步函数，重活必须 `loop.create_task`；发消息要用异步版 `acreate/apatch`，别用阻塞的 `create/patch`。容器冷启动首次 WS 可能 DNS 未就绪（`No address associated with hostname`），SDK 会自动重连，无需处理。
+
 ## 关键文件地图
 
 | 关注点 | 文件 |
@@ -66,4 +74,5 @@ curl -N -X POST http://127.0.0.1:8081/api/assistant -H "Authorization: Bearer $T
 | 联网搜索 | `ai-engine/app/mcp_search.py` |
 | 异步 worker | `ai-engine/app/worker.py` |
 | 前端（Vue） | `frontend/src/App.vue`、`frontend/src/api.js` |
+| 飞书接入 | `feishu-adapter/app/{main,bot,gateway,feishu_api,card}.py` |
 | nginx 反代 | `deploy/nginx.dev.conf` |

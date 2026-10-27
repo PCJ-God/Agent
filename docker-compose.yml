@@ -26,6 +26,7 @@ services:
       RABBITMQ_URL: "amqp://acp:${RABBITMQ_PASSWORD:-acp}@rabbitmq:5672/"
       AI_GRPC_ADDR: ai-engine:50051
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      FEISHU_ADAPTER_TOKEN: ${FEISHU_ADAPTER_TOKEN:-dev-feishu-internal-token}
       RATE_LIMIT_PER_DAY: ${RATE_LIMIT_PER_DAY:-20}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123456}
@@ -99,6 +100,21 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+  # ─────────────────── 飞书适配器（新渠道：飞书机器人，自建） ───────────────────
+  feishu-adapter:
+    build: ./feishu-adapter
+    image: acp-feishu-adapter
+    container_name: acp-feishu-adapter
+    restart: unless-stopped
+    environment:
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      FEISHU_ADAPTER_TOKEN: ${FEISHU_ADAPTER_TOKEN:-dev-feishu-internal-token}
+      GATEWAY_URL: http://gateway:8080
+    depends_on:
+      gateway:
+        condition: service_started
 
   # ─────────────────── 关系库：MySQL ───────────────────
   mysql:

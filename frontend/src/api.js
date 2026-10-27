@@ -50,6 +50,11 @@ export function getFileStatus(token, taskIds) {
 // 管理员：重灌课程知识库
 export const reindex = (t) => postJson('/api/admin/reindex', {}, t)
 
+// 飞书绑定
+export const feishuBindStatus = (t) => getJson('/api/bind/feishu/status', t)
+export const bindFeishu = (t, code) => postJson('/api/bind/feishu', { code }, t)
+export const unbindFeishu = (t) => postJson('/api/bind/feishu/unbind', {}, t)
+
 // 统一对话入口：SSE 流式。事件对象形如
 // {type:'step', text} / {type:'delta', text} / {type:'sources', sources} / {type:'done'} / {type:'error', text}
 export async function chatStream(token, body, onEvent) {
