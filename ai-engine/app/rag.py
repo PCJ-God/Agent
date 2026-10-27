@@ -1,20 +1,66 @@
-"""RAG 检索管线（Phase 3）。
+"""RAG 检索管线：LlamaIndex（QdrantVectorStore + BM25Retriever + DashScopeRerank）。
 
-文档摄入 → 结构感知分块 → 向量化（DashScope text-embedding-v4）→ 写入 Chroma
-→ 语义检索。生成侧在 rag_api.py 里把检索结果拼进 prompt，并带 [i] 引用编号。
+- 摄入：标题感知分块（header_path 溯源）→ DashScope 嵌入（分批，httpx 直连）→ Qdrant
+- 检索：向量召回 + BM25 关键词召回 → RRF 融合 → 可选 gte-rerank 重排
 """
 from __future__ import annotations
 
 from pathlib import Path
-from urllib.parse import urlparse
+from uuid import uuid4
 
-import chromadb
 import httpx
+import jieba
+from llama_index.core.schema import TextNode
+from llama_index.core.vector_stores import VectorStoreQuery
+from llama_index.postprocessor.dashscope_rerank import DashScopeRerank
+from llama_index.retrievers.bm25 import BM25Retriever
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
 
-from app.config import CHROMA_URL, DASHSCOPE_API_KEY, EMBEDDING_MODEL, EMBEDDING_URL
+from app.config import (
+    DASHSCOPE_API_KEY,
+    EMBEDDING_MODEL,
+    EMBEDDING_URL,
+    QDRANT_URL,
+    RAG_COLLECTION,
+    RERANK_ENABLED,
+    RERANK_MODEL,
+)
 
-COLLECTION_NAME = "acp_docs"
+VECTOR_TOP_K = 12   # 向量召回候选数
+BM25_TOP_K = 12     # 关键词召回候选数
+FUSION_TOP_K = 8    # RRF 融合后候选数
+EMBED_BATCH = 8     # DashScope 嵌入单批上限 10，留余量
 
+
+# 模块级状态：全部节点（供 BM25）+ BM25 检索器
+_all_nodes: list[TextNode] = []
+_bm25: BM25Retriever | None = None
+
+
+# ─────────────────────── 嵌入（分批） ───────────────────────
+
+def embed_texts(texts: list[str]) -> list[list[float]]:
+    out: list[list[float]] = []
+    with httpx.Client(timeout=60) as client:
+        for i in range(0, len(texts), EMBED_BATCH):
+            batch = texts[i:i + EMBED_BATCH]
+            resp = client.post(
+                EMBEDDING_URL,
+                headers={"Authorization": f"Bearer {DASHSCOPE_API_KEY}"},
+                json={"model": EMBEDDING_MODEL, "input": batch},
+            )
+            resp.raise_for_status()
+            items = sorted(resp.json()["data"], key=lambda x: x["index"])
+            out.extend(it["embedding"] for it in items)
+    return out
+
+
+def _zh_tokenizer(text: str) -> list[str]:
+    return [t for t in jieba.cut(text) if t.strip()]
+
+
+# ─────────────────────── 分块 ───────────────────────
 
 def _chunk_markdown(text: str, source: str) -> list[dict]:
     """按标题层级切块，写入 header_path 溯源元数据。"""
@@ -44,127 +90,131 @@ def _chunk_markdown(text: str, source: str) -> list[dict]:
     return chunks
 
 
-EMBED_BATCH_SIZE = 8  # DashScope 嵌入接口单批上限 10 条，留余量
+def _to_nodes(chunks: list[dict]) -> list[TextNode]:
+    return [
+        TextNode(
+            text=ch["text"],
+            id_=str(uuid4()),  # Qdrant 点 ID 仅接受 uint 或 UUID
+            metadata={"source": ch["source"], "header_path": ch["header_path"]},
+        )
+        for ch in chunks
+    ]
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
-    """用 DashScope 兼容接口批量向量化（服务端单批上限 10 条，分批调用）。"""
-    embeddings: list[list[float]] = []
-    with httpx.Client(timeout=60) as client:
-        for i in range(0, len(texts), EMBED_BATCH_SIZE):
-            batch = texts[i:i + EMBED_BATCH_SIZE]
-            resp = client.post(
-                EMBEDDING_URL,
-                headers={"Authorization": f"Bearer {DASHSCOPE_API_KEY}"},
-                json={"model": EMBEDDING_MODEL, "input": batch},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            items = sorted(data["data"], key=lambda x: x["index"])
-            embeddings.extend(it["embedding"] for it in items)
-    return embeddings
+# ─────────────────────── 摄入 ───────────────────────
+
+def _vector_store() -> QdrantVectorStore:
+    return QdrantVectorStore(
+        collection_name=RAG_COLLECTION,
+        client=QdrantClient(url=QDRANT_URL),
+    )
 
 
-def _get_collection():
-    """Chroma 集合（余弦相似度）。host/port 从 CHROMA_URL 解析。"""
-    u = urlparse(CHROMA_URL)
-    client = chromadb.HttpClient(host=u.hostname, port=u.port or 8000)
-    return client.get_or_create_collection(
-        name=COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
+def _rebuild_bm25() -> None:
+    global _bm25
+    _bm25 = BM25Retriever.from_defaults(
+        nodes=_all_nodes,
+        similarity_top_k=BM25_TOP_K,
+        tokenizer=_zh_tokenizer,
     )
 
 
 def ingest_docs(docs_dir: str) -> dict:
-    """把 docs_dir 下所有 .md 分块、向量化、写入 Chroma（幂等：清空重建）。"""
+    """清空重建：把 docs_dir 下所有 .md 分块、向量化、写入 Qdrant。"""
+    global _all_nodes
     docs_dir = Path(docs_dir)
     if not docs_dir.is_dir():
         return {"ingested": 0, "error": f"docs dir not found: {docs_dir}"}
 
-    rows: list[dict] = []
+    chunks: list[dict] = []
     for md in sorted(docs_dir.glob("*.md")):
-        rows.extend(_chunk_rows(md.name, md.read_text(encoding="utf-8")))
-
-    if not rows:
+        chunks.extend(_chunk_markdown(md.read_text(encoding="utf-8"), md.name))
+    if not chunks:
         return {"ingested": 0}
 
-    n = _add_rows(rows, clear=True)
+    _all_nodes = _to_nodes(chunks)
+    embs = embed_texts([n.get_content() for n in _all_nodes])
+    for n, e in zip(_all_nodes, embs):
+        n.embedding = e
+
+    client = QdrantClient(url=QDRANT_URL)
+    if client.collection_exists(RAG_COLLECTION):
+        client.delete_collection(RAG_COLLECTION)
+    _vector_store().add(_all_nodes)
+    _rebuild_bm25()
+
     return {
-        "ingested": n,
-        "sources": sorted({r["metadata"]["source"] for r in rows}),
+        "ingested": len(_all_nodes),
+        "sources": sorted({n.metadata["source"] for n in _all_nodes}),
     }
 
 
-def _chunk_rows(name: str, text: str, source: str | None = None) -> list[dict]:
-    """把单篇文档内容分块成待写入的行。name 用于唯一 ID，source 用于溯源标签。"""
-    rows: list[dict] = []
-    for i, ch in enumerate(_chunk_markdown(text, source or name)):
-        rows.append({
-            "id": f"{name}-{i}",
-            "document": f"{ch['header_path']}\n\n{ch['text']}",
-            "metadata": {"source": ch["source"], "header_path": ch["header_path"]},
-        })
-    return rows
-
-
-def _add_rows(rows: list[dict], clear: bool = False) -> int:
-    """把分块写入 Chroma。clear=True 时先清空集合（幂等重建）。"""
-    if not rows:
-        return 0
-    col = _get_collection()
-    if clear:
-        existing = col.get()["ids"]
-        if existing:
-            col.delete(ids=existing)
-    col.add(
-        ids=[r["id"] for r in rows],
-        documents=[r["document"] for r in rows],
-        embeddings=embed_texts([r["document"] for r in rows]),
-        metadatas=[r["metadata"] for r in rows],
-    )
-    return len(rows)
-
-
 def ingest_text(name: str, text: str, source: str | None = None) -> dict:
-    """把单篇文档内容追加写入 Chroma（供异步解析 worker 调用）。"""
-    rows = _chunk_rows(name, text, source)
-    return {"ingested": _add_rows(rows)}
+    """追加单篇文档（worker / 管理员入库调用）。"""
+    global _all_nodes
+    chunks = _chunk_markdown(text, source or name)
+    if not chunks:
+        return {"ingested": 0}
+
+    nodes = _to_nodes(chunks)
+    embs = embed_texts([n.get_content() for n in nodes])
+    for n, e in zip(nodes, embs):
+        n.embedding = e
+
+    _vector_store().add(nodes)
+    _all_nodes.extend(nodes)
+    _rebuild_bm25()
+    return {"ingested": len(nodes)}
+
+
+# ─────────────────────── 检索 ───────────────────────
+
+def _rrf(result_lists: list[list[TextNode]], k: int = 60) -> list[tuple[TextNode, float]]:
+    """倒数排名融合（RRF），返回 (节点, 融合分)。"""
+    scores: dict[str, float] = {}
+    by_id: dict[str, TextNode] = {}
+    for nodes in result_lists:
+        for rank, n in enumerate(nodes):
+            scores[n.node_id] = scores.get(n.node_id, 0.0) + 1.0 / (k + rank + 1)
+            by_id[n.node_id] = n
+    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    return [(by_id[nid], s) for nid, s in ranked]
 
 
 def retrieve(query: str, k: int = 4) -> list[dict]:
-    """语义检索，返回 top-k 切片（带溯源元数据与相似度）。"""
-    emb = embed_texts([query])[0]
-    col = _get_collection()
-    res = col.query(
-        query_embeddings=[emb], n_results=k, include=["documents", "metadatas", "distances"]
-    )
-    out: list[dict] = []
-    for doc, meta, dist in zip(res["documents"][0], res["metadatas"][0], res["distances"][0]):
-        out.append({
-            "text": doc,
-            "source": meta.get("source", ""),
-            "header_path": meta.get("header_path", ""),
-            "score": round(1 - dist, 4),  # cosine distance -> similarity
-        })
-    return out
+    if not _all_nodes:
+        return []
 
+    # 1) 向量召回（语义）
+    q_emb = embed_texts([query])[0]
+    vs_query = VectorStoreQuery(query_embedding=q_emb, similarity_top_k=VECTOR_TOP_K)
+    vec_nodes = list(_vector_store().query(vs_query).nodes or [])
 
-def build_rag_messages(query: str, k: int = 4) -> tuple[list[dict], list[dict]]:
-    """检索并拼出带引用的 messages。返回 (messages, hits)。"""
-    hits = retrieve(query, k)
-    if not hits:
-        return [{"role": "user", "content": query}], []
+    # 2) BM25 关键词召回
+    bm_nodes = [n for n in (_bm25.retrieve(query) if _bm25 else [])]
 
-    parts = [
-        f"[{i}] 来源《{h['source']}》 {h['header_path']}\n{h['text']}"
-        for i, h in enumerate(hits, 1)
+    # 3) RRF 融合
+    pairs = _rrf([vec_nodes, bm_nodes])[:FUSION_TOP_K]
+    fused = [n for n, _ in pairs]
+    rrf_scores = {n.node_id: s for n, s in pairs}
+
+    # 4) 重排（可选）
+    scored: list[tuple[TextNode, float]]
+    if fused and RERANK_ENABLED:
+        reranker = DashScopeRerank(
+            top_n=min(k, len(fused)), model=RERANK_MODEL, api_key=DASHSCOPE_API_KEY
+        )
+        ranked = reranker.postprocess_nodes(fused, query_str=query)
+        scored = [(r.node, r.score) for r in ranked[:k]]
+    else:
+        scored = [(n, rrf_scores.get(n.node_id, 0.0)) for n in fused[:k]]
+
+    return [
+        {
+            "text": n.get_content(),
+            "source": n.metadata.get("source", ""),
+            "header_path": n.metadata.get("header_path", ""),
+            "score": round(s, 4),
+        }
+        for n, s in scored
     ]
-    context = "\n\n".join(parts)
-    system = (
-        "你是阿里云 ACP 认证学习助手。请仅依据下面给出的资料回答问题，"
-        "在引用处标注编号（如 [1]）。资料不足以回答时，明确说资料不足，不要编造。"
-    )
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": f"资料：\n{context}\n\n问题：{query}"},
-    ]
-    return messages, hits

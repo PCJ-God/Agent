@@ -1,17 +1,30 @@
 """ACP Copilot — AI 引擎。
 
-Phase 2：/chat 纯文本对话（SSE 流式）。
-Phase 3：/rag/ingest + /chat/rag 检索增强对话。
-Phase 4：/chat/agent 工具调用。
-Phase 5：/chat/memory 记忆对话。
-Phase 7：/metrics 监控埋点。
+HTTP 仅保留 /health /metrics（Docker 探活 + Prometheus 采集），业务全走 gRPC（50051）。
 """
+from contextlib import asynccontextmanager
+
+import grpc
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 
-from app import agent_api, chat, memory_api, metrics, rag_api
+from app import grpc_server, metrics
+from gen import assistant_pb2_grpc
 
-app = FastAPI(title="ACP Copilot AI Engine")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    server = grpc.aio.server()
+    assistant_pb2_grpc.add_AssistantServiceServicer_to_server(
+        grpc_server.AssistantServicer(), server
+    )
+    server.add_insecure_port("[::]:50051")
+    await server.start()
+    yield
+    await server.stop(0)
+
+
+app = FastAPI(title="ACP Copilot AI Engine", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -28,9 +41,3 @@ async def health() -> dict:
 @app.get("/metrics")
 async def get_metrics() -> PlainTextResponse:
     return PlainTextResponse(metrics.render())
-
-
-app.include_router(chat.router)
-app.include_router(rag_api.router)
-app.include_router(agent_api.router)
-app.include_router(memory_api.router)

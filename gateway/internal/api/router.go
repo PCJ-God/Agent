@@ -14,14 +14,21 @@ func NewRouter(h *Handler, jwtSecret string) *gin.Engine {
 	v1.POST("/auth/login", h.Login)
 
 	authed := v1.Group("")
-	authed.Use(AuthMiddleware(jwtSecret))
+	authed.Use(AuthMiddleware(jwtSecret, h.Redis))
 	authed.GET("/auth/me", h.Me)
-	authed.POST("/chat", h.Chat)
-	authed.POST("/chat/rag", h.ChatRag)
-	authed.POST("/chat/agent", h.ChatAgent)
-	authed.POST("/chat/memory", h.ChatMemory)
-	authed.POST("/rag/ingest", h.RagIngest)
-	authed.POST("/files/upload", h.UploadFile)
+	authed.POST("/auth/logout", h.Logout)
+
+	// 昂贵接口加每日限流
+	limited := authed.Group("")
+	limited.Use(RateLimitMiddleware(h.Limiter))
+	limited.POST("/assistant", h.Assistant)
+	limited.POST("/files/upload", h.UploadFiles)
+	limited.GET("/files/status", h.ParseStatus)
+
+	admin := authed.Group("/admin")
+	admin.Use(AdminOnly())
+	admin.POST("/kb/add", h.AdminKBAdd)
+	admin.POST("/reindex", h.Reindex)
 
 	return r
 }

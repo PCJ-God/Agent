@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package assistant.v1;
+
+option go_package = "github.com/acp-copilot/gateway/gen/assistant/v1;assistantv1";
+
+// AI 引擎对网关暴露的服务：统一入口 + 知识库写入。
+service AssistantService {
+  // 流式对话：网关发一条请求，ai-engine 以服务端流返回事件
+  //（思考/工具轨迹、引用来源、文本增量、完成、错误）。
+  rpc Chat(ChatRequest) returns (stream ChatEvent);
+
+  // 摄入一段文本到知识库（worker 解析文档后调用）。
+  rpc IngestText(IngestTextRequest) returns (IngestTextResponse);
+
+  // 重灌课程知识库（管理员触发）。
+  rpc Reindex(ReindexRequest) returns (ReindexResponse);
+}
+
+message ChatRequest {
+  string user_id = 1;              // 用户 ID（长期记忆隔离）
+  string session_id = 2;           // 会话 ID（短期记忆隔离）
+  string message = 3;              // 用户问题
+  repeated string task_ids = 4;    // 关联的附件解析任务（解析结果在 Redis，ai-engine 按 ID 读取）
+}
+
+message ChatEvent {
+  string type = 1;                 // "step" | "sources" | "delta" | "done" | "error"
+  string text = 2;                 // delta 文本 / 步骤描述 / 错误信息
+  repeated Source sources = 3;     // type=sources 时携带引用来源
+  bool done = 4;                   // type=done 时为 true
+}
+
+message Source {
+  string source = 1;
+  string header_path = 2;
+  double score = 3;
+}
+
+message IngestTextRequest {
+  string name = 1;                 // 文档名（用于 chunk ID 与溯源）
+  string text = 2;                 // 解析后的纯文本
+  string source = 3;               // 溯源标签（如原文件名）
+}
+
+message IngestTextResponse {
+  int32 ingested = 1;              // 写入的切片数
+}
+
+message ReindexRequest {
+  string docs_dir = 1;             // 可选，默认 /app/data/docs
+}
+
+message ReindexResponse {
+  int32 ingested = 1;
+  repeated string sources = 2;
+}
