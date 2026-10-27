@@ -28,6 +28,12 @@ const adminFiles = ref([])
 const adminMsg = ref('')
 const adminBusy = ref(false)
 
+// 飞书绑定
+const feishuCode = ref('')
+const feishuBound = ref(false)
+const feishuMsg = ref('')
+const feishuBusy = ref(false)
+
 function saveAuth(t, u) {
   token.value = t
   user.value = u
@@ -174,6 +180,48 @@ async function adminReindex() {
     adminBusy.value = false
   }
 }
+
+async function loadFeishuStatus() {
+  feishuMsg.value = ''
+  try {
+    const { bound } = await api.feishuBindStatus(token.value)
+    feishuBound.value = !!bound
+  } catch (e) {
+    feishuMsg.value = `查询失败：${e.message}`
+  }
+}
+
+async function doBindFeishu() {
+  const code = feishuCode.value.trim()
+  if (!code || feishuBusy.value) return
+  feishuBusy.value = true
+  feishuMsg.value = ''
+  try {
+    await api.bindFeishu(token.value, code)
+    feishuBound.value = true
+    feishuCode.value = ''
+    feishuMsg.value = '绑定成功，现在可以在飞书里 @机器人 对话了。'
+  } catch (e) {
+    feishuMsg.value = `绑定失败：${e.message}`
+  } finally {
+    feishuBusy.value = false
+  }
+}
+
+async function doUnbindFeishu() {
+  if (feishuBusy.value) return
+  feishuBusy.value = true
+  feishuMsg.value = ''
+  try {
+    await api.unbindFeishu(token.value)
+    feishuBound.value = false
+    feishuMsg.value = '已解绑飞书。'
+  } catch (e) {
+    feishuMsg.value = `解绑失败：${e.message}`
+  } finally {
+    feishuBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -201,6 +249,7 @@ async function adminReindex() {
       <h1>ACP Copilot</h1>
       <nav>
         <button :class="{ on: view === 'chat' }" @click="view = 'chat'">对话</button>
+        <button :class="{ on: view === 'feishu' }" @click="view = 'feishu'; loadFeishuStatus()">飞书绑定</button>
         <button v-if="isAdmin" :class="{ on: view === 'admin' }" @click="view = 'admin'">知识库管理</button>
       </nav>
       <div class="who">
@@ -256,7 +305,7 @@ async function adminReindex() {
       </div>
     </main>
 
-    <main v-else-if="isAdmin" class="admin">
+    <main v-else-if="view === 'admin' && isAdmin" class="admin">
       <section class="card">
         <h2>重灌课程知识库</h2>
         <p>清空并重建 Qdrant 中的课程知识库，重新分块、向量化 /app/data/docs 下的全部文档。</p>
@@ -272,6 +321,21 @@ async function adminReindex() {
         <button class="primary" :disabled="adminBusy || !adminFiles.length" @click="adminUpload">上传入库</button>
       </section>
       <p v-if="adminMsg" class="admin-msg">{{ adminMsg }}</p>
+    </main>
+
+    <main v-else-if="view === 'feishu'" class="admin">
+      <section class="card">
+        <h2>飞书绑定</h2>
+        <p>绑定后即可在飞书里 @机器人 提问，AI 服务与 Web 端共用同一账号和长期记忆。</p>
+        <p v-if="feishuBound" class="ok-hint">当前状态：已绑定</p>
+        <p v-else>当前状态：未绑定。请先在飞书里 @机器人 发送「绑定」，拿到验证码后在此输入。</p>
+        <div v-if="!feishuBound" class="bind-row">
+          <input v-model="feishuCode" placeholder="输入 6 位绑定码" maxlength="6" />
+          <button class="primary" :disabled="feishuBusy || !feishuCode.trim()" @click="doBindFeishu">绑定</button>
+        </div>
+        <button v-else class="ghost danger" :disabled="feishuBusy" @click="doUnbindFeishu">解绑飞书</button>
+        <p v-if="feishuMsg" class="admin-msg">{{ feishuMsg }}</p>
+      </section>
     </main>
   </div>
 </template>
@@ -328,4 +392,8 @@ nav button.on { background: #2563eb; border-color: #2563eb; color: #fff; }
 .admin p { color: #64748b; font-size: 14px; margin: 0 0 12px; }
 .admin input[type="file"] { margin-bottom: 10px; font-size: 13px; }
 .admin-msg { padding: 12px; border-radius: 8px; background: #fff; border: 1px solid #e2e8f0; }
+.bind-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.bind-row input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font: inherit; font-size: 15px; }
+.danger { border-color: #dc2626; color: #dc2626; }
+.ok-hint { color: #16a34a !important; font-weight: 600; }
 </style>

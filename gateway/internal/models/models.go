@@ -10,6 +10,7 @@ type User struct {
 	Username     string    `gorm:"uniqueIndex;size:64;not null" json:"username"`
 	PasswordHash string    `gorm:"size:255;not null" json:"-"`
 	Role         string    `gorm:"size:16;not null;default:user" json:"role"`
+	FeishuOpenID string    `gorm:"index;size:64" json:"-"` // 绑定的飞书 open_id，空表示未绑定
 	CreatedAt    time.Time `json:"created_at"`
 }
 

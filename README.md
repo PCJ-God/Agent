@@ -9,6 +9,7 @@
 - **多模态附件**：支持 PDF / Word / 图片（OCR）/ 文本上传，解析后注入对话上下文。
 - **管理员知识库管理**：一键重灌课程库、上传文档异步入库。
 - **可观测**：Prometheus 指标 + Grafana 面板，网关与 AI 引擎均暴露 `/metrics`。
+- **飞书机器人**：学员可在飞书里 @机器人 提问，回答以交互卡片流式呈现；需先在 Web 端绑定飞书账号（验证码），账号与长期记忆与 Web 端共用。
 
 ## 系统架构
 
@@ -33,6 +34,8 @@ ai-engine（Python · FastAPI + AgentScope ReActAgent）
    │
    ▼  RabbitMQ doc_parse 队列
 ai-worker（异步文档解析：docx / pdf / OCR → gRPC IngestText 写回课程库）
+
+飞书用户 ── 长连接 ──▶ feishu-adapter（绑定 Web 账号后以网关签发的 JWT 调 /api/assistant）
 
 基础设施：MySQL / Redis / RabbitMQ / Qdrant / MinIO / Prometheus + Grafana
 ```
