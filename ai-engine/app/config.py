@@ -27,6 +27,8 @@ MAX_AGENT_ITERS = int(os.getenv("MAX_AGENT_ITERS", "8"))
 
 # Redis：文档解析结果缓存（worker 写、ai-engine 读）
 REDIS_ADDR = os.getenv("REDIS_ADDR", "redis:6379")
+# redis-py 的 from_url 需要带 scheme；兼容 host:port 与完整 URL 两种写法
+REDIS_URL = REDIS_ADDR if "://" in REDIS_ADDR else f"redis://{REDIS_ADDR}/0"
 PARSE_RESULT_TTL = int(os.getenv("PARSE_RESULT_TTL", "1800"))
 
 # 上传限制
@@ -35,8 +37,8 @@ MAX_FILES = int(os.getenv("MAX_FILES", "5"))
 MAX_TOTAL_MB = int(os.getenv("MAX_TOTAL_MB", "30"))
 MAX_TEXT_CHARS = int(os.getenv("MAX_TEXT_CHARS", "30000"))
 
-# OCR：照片 / 扫描件（DashScope 视觉 OCR）
-OCR_MODEL = os.getenv("OCR_MODEL", "qwen-vl-ocr")
+# 视觉理解：照片 / 扫描件 / 图片（强视觉模型 → 生成结构化描述 + 文字）
+VISION_MODEL = os.getenv("VISION_MODEL", "qwen3-vl-plus")
 
 # 异步：文档解析队列
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://acp:acp@rabbitmq:5672/")

@@ -1,6 +1,31 @@
 <script setup>
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import * as api from './api'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import hljs from 'highlight.js/lib/common'
+import { markedHighlight } from 'marked-highlight'
+import 'highlight.js/styles/github-dark.css'
+
+// 代码块语法高亮（highlight.js + marked 插件）
+marked.use(markedHighlight({
+  emptyLangClass: 'hljs',
+  langPrefix: 'hljs language-',
+  highlight(code, lang) {
+    const language = hljs.getLanguage(lang) ? lang : 'plaintext'
+    return hljs.highlight(code, { language }).value
+  },
+}))
+
+// 把模型返回的 Markdown 渲染为安全的 HTML（防 XSS）
+function renderMd(text) {
+  if (!text) return ''
+  try {
+    return DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }))
+  } catch {
+    return text
+  }
+}
 
 const token = ref(localStorage.getItem('acp_token') || '')
 const user = ref(JSON.parse(localStorage.getItem('acp_user') || 'null'))
@@ -268,7 +293,7 @@ async function doUnbindFeishu() {
             <div v-if="m.files && m.files.length" class="chips">
               <span v-for="f in m.files" :key="f" class="chip">📎 {{ f }}</span>
             </div>
-            <div class="text">{{ m.text }}</div>
+            <div class="text markdown-body" v-html="renderMd(m.text)"></div>
             <div v-if="m.steps && m.steps.length" class="steps">
               <div v-for="s in m.steps" :key="s" class="step">{{ s }}</div>
             </div>
@@ -396,4 +421,30 @@ nav button.on { background: #2563eb; border-color: #2563eb; color: #fff; }
 .bind-row input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font: inherit; font-size: 15px; }
 .danger { border-color: #dc2626; color: #dc2626; }
 .ok-hint { color: #16a34a !important; font-weight: 600; }
+
+/* Markdown 正文样式（v-html 内容需用 :deep 穿透 scoped） */
+.markdown-body { white-space: normal; }
+.markdown-body :deep(p) { margin: 0 0 8px; }
+.markdown-body :deep(p:last-child) { margin-bottom: 0; }
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) { margin: 6px 0; padding-left: 22px; }
+.markdown-body :deep(li) { margin: 3px 0; }
+.markdown-body :deep(strong) { font-weight: 700; }
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) { margin: 10px 0 6px; line-height: 1.3; }
+.markdown-body :deep(h1) { font-size: 1.4em; }
+.markdown-body :deep(h2) { font-size: 1.25em; }
+.markdown-body :deep(h3) { font-size: 1.1em; }
+.markdown-body :deep(code) { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 13px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.markdown-body :deep(pre) { background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+.markdown-body :deep(pre code) { background: transparent; padding: 0; color: inherit; }
+.markdown-body :deep(blockquote) { border-left: 3px solid #cbd5e1; margin: 8px 0; padding: 2px 0 2px 10px; color: #64748b; }
+.markdown-body :deep(a) { color: #2563eb; text-decoration: underline; }
+.markdown-body :deep(hr) { border: none; border-top: 1px solid #e2e8f0; margin: 12px 0; }
+.markdown-body :deep(table) { border-collapse: collapse; margin: 8px 0; }
+.markdown-body :deep(th),
+.markdown-body :deep(td) { border: 1px solid #e2e8f0; padding: 5px 9px; text-align: left; }
+.markdown-body :deep(th) { background: #f8fafc; }
 </style>

@@ -6,13 +6,13 @@ import asyncio
 import redis
 
 from app import assistant, rag
-from app.config import DOCS_DIR, REDIS_ADDR
+from app.config import DOCS_DIR, REDIS_URL
 from gen import assistant_pb2, assistant_pb2_grpc
 
 
 def _get_parse_result(task_id: str) -> str:
     try:
-        r = redis.Redis.from_url(REDIS_ADDR, decode_responses=True)
+        r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
         return r.get(f"parse:{task_id}") or ""
     except Exception:
         return ""
