@@ -72,7 +72,7 @@ services:
       DOCS_DIR: /app/data/docs
       REDIS_ADDR: redis:6379
       RABBITMQ_URL: "amqp://acp:${RABBITMQ_PASSWORD:-acp}@rabbitmq:5672/"
-      OCR_MODEL: ${OCR_MODEL:-qwen-vl-ocr}
+      VISION_MODEL: ${VISION_MODEL:-qwen3-vl-plus}
     depends_on:
       qdrant:
         condition: service_started
@@ -92,7 +92,7 @@ services:
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?DASHSCOPE_API_KEY must be set in .env}
       RABBITMQ_URL: "amqp://acp:${RABBITMQ_PASSWORD:-acp}@rabbitmq:5672/"
       REDIS_ADDR: redis:6379
-      OCR_MODEL: ${OCR_MODEL:-qwen-vl-ocr}
+      VISION_MODEL: ${VISION_MODEL:-qwen3-vl-plus}
     depends_on:
       ai-engine:
         condition: service_started    # ingest 任务经 gRPC 写知识库，需 ai-engine 在线
@@ -227,10 +227,13 @@ services:
     container_name: acp-nginx
     restart: unless-stopped
     ports:
-      - "8081:80"     # 宿主机 80 被系统 HTTP.sys 占用，改映射到 8081（本地无 TLS）
+      - "${NGINX_HTTP_PORT:-8081}:80"      # 本地默认 8081；生产 .env 设 80
+      - "${NGINX_HTTPS_PORT:-8443}:443"    # 本地默认 8443；生产 .env 设 443
     volumes:
-      - ./deploy/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+      - ${NGINX_CONF_PATH:-./deploy/nginx.dev.conf}:/etc/nginx/nginx.conf:ro
       - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./deploy/certs:/etc/nginx/certs:ro   # TLS 证书目录（生产生成；本地可为空）
+      - ./deploy/certbot/www:/var/www/certbot:ro   # ACME HTTP-01 验证目录
     depends_on:
       - gateway
 

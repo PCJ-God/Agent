@@ -16,7 +16,7 @@ import pika
 import redis
 
 from app import understanding
-from app.config import PARSE_RESULT_TTL, RABBITMQ_URL, REDIS_ADDR
+from app.config import PARSE_RESULT_TTL, RABBITMQ_URL, REDIS_URL
 from gen import assistant_pb2, assistant_pb2_grpc
 
 QUEUE = "doc_parse"
@@ -26,7 +26,7 @@ logger = logging.getLogger("worker")
 
 
 def _redis() -> redis.Redis:
-    return redis.Redis.from_url(REDIS_ADDR, decode_responses=True)
+    return redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
 def _set_result(task_id: str, status: str, text: str = "") -> None:

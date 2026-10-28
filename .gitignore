@@ -38,6 +38,9 @@ logs/
 # TLS 证书与私钥（私钥绝不能进仓库）
 *.pem
 *.key
+deploy/certs/
+deploy/letsencrypt/
+deploy/certbot/www/
 
 # Frontend dependencies and build output
 node_modules/

@@ -2,8 +2,8 @@
 
 - 纯文本（md/txt/json/csv/log）：原样解码
 - docx：python-docx 抽段落 + 表格文字
-- pdf：pymupdf 抽文字层；扫描版转图片走 OCR
-- 图片（png/jpg/jpeg/webp）：DashScope 视觉 OCR（qwen-vl-ocr）
+- pdf：pymupdf 抽文字层；扫描版转图片走视觉理解
+- 图片（png/jpg/jpeg/webp）：强视觉模型生成「结构化描述 + 文字」（VISION_MODEL，走 OpenAI 兼容接口）
 解析后文字超 MAX_TEXT_CHARS 抛 ValueError（对应「文档内容过长」）。
 """
 from __future__ import annotations
@@ -14,12 +14,19 @@ from io import BytesIO
 import fitz  # pymupdf
 import httpx
 
-from app.config import DASHSCOPE_API_KEY, MAX_TEXT_CHARS, OCR_MODEL
-
-OCR_URL = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
+from app.config import DASHSCOPE_API_KEY, DASHSCOPE_CHAT_URL, MAX_TEXT_CHARS, VISION_MODEL
 
 TEXT_EXTS = (".md", ".txt", ".json", ".csv", ".log")
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp")
+
+# 视觉模型提示词：产出「图片描述 + 文字内容」两部分，便于注入对话上下文
+VISION_PROMPT = (
+    "请阅读这张图片并用中文输出两部分：\n"
+    "1）图片描述：说明图片类型与主要内容；若是图表、表格、流程图或示意图，"
+    "请结构化描述其标题、坐标轴/表头、数据、趋势与结构关系。\n"
+    "2）文字内容：逐字提取图中所有可见文字，尽量保持原有顺序与结构。\n"
+    "若某部分没有内容，写「无」。"
+)
 
 
 def parse(filename: str, content: bytes) -> tuple[str, dict]:
@@ -35,7 +42,7 @@ def parse(filename: str, content: bytes) -> tuple[str, dict]:
         text = _parse_pdf(content)
         meta = {"filename": filename, "type": "pdf"}
     elif lower.endswith(IMAGE_EXTS):
-        text = _ocr_image(content)
+        text = _describe_image(content)
         meta = {"filename": filename, "type": "image"}
     else:
         raise ValueError(f"不支持的文件类型: {lower}")
@@ -63,30 +70,41 @@ def _parse_pdf(content: bytes) -> str:
     text = "\n".join(parts).strip()
     if text:
         return text
-    # 扫描版 PDF：逐页渲染成图片 OCR
-    ocr_parts = []
-    for page in doc:
-        pix = page.get_pixmap(dpi=150)
-        ocr_parts.append(_ocr_image(pix.tobytes("png")))
-    return "\n".join(ocr_parts)
+    # 扫描版 PDF：逐页渲染成图片走视觉理解
+    return "\n".join(
+        _describe_image(page.get_pixmap(dpi=150).tobytes("png")) for page in doc
+    )
 
 
-def _ocr_image(content: bytes) -> str:
+def _img_mime(content: bytes) -> str:
+    if content[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if content[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/png"
+
+
+def _describe_image(content: bytes) -> str:
+    """用强视觉模型对图片生成「结构化描述 + 文字」，作为归一化文本返回。"""
     b64 = base64.b64encode(content).decode()
+    data_uri = f"data:{_img_mime(content)};base64,{b64}"
     payload = {
-        "model": OCR_MODEL,
-        "input": {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [{"image": f"data:image/png;base64,{b64}"}],
-                }
-            ]
-        },
+        "model": VISION_MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": data_uri}},
+                    {"type": "text", "text": VISION_PROMPT},
+                ],
+            }
+        ],
     }
     with httpx.Client(timeout=120) as client:
         resp = client.post(
-            OCR_URL,
+            DASHSCOPE_CHAT_URL,
             headers={
                 "Authorization": f"Bearer {DASHSCOPE_API_KEY}",
                 "Content-Type": "application/json",
@@ -96,10 +114,7 @@ def _ocr_image(content: bytes) -> str:
         resp.raise_for_status()
         data = resp.json()
 
-    choices = data.get("output", {}).get("choices", [])
+    choices = data.get("choices", [])
     if not choices:
         return ""
-    content = choices[0].get("message", {}).get("content", "")
-    if isinstance(content, list):
-        return "".join(c.get("text", "") for c in content if isinstance(c, dict))
-    return content or ""
+    return choices[0].get("message", {}).get("content", "") or ""
