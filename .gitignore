@@ -47,3 +47,5 @@ node_modules/
 frontend/dist/
 
 legacy-tutor/
+
+docs/
