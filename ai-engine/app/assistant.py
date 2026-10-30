@@ -5,12 +5,18 @@
 - web_search：DashScope MCP 联网搜索兜底
 - record_to_memory / retrieve_from_memory：agent_control 自动注册
 
-短期记忆：InMemoryMemory（进程内，新会话清空）
-长期记忆：Mem0LongTermMemory（qwen-plus + text-embedding-v4 2048 维，Qdrant）
+并发模型：
+- Agent 按 (user_id, session_id) 缓存 —— 每条会话独立 Agent、独立短期记忆，
+  同一用户多端/多会话并发互不干扰。
+- 同一会话内用 asyncio.Lock 串行（避免共享 Agent 的消息队列被并发覆盖）。
+- 长期记忆（Mem0LongTermMemory）按 user_id 共享 —— 跨会话画像本就该共享。
+- Agent 缓存带 LRU 上限，防止会话数无限增长撑爆内存。
 """
 from __future__ import annotations
 
 import asyncio
+import os
+from collections import OrderedDict
 from typing import AsyncGenerator
 from urllib.parse import urlparse
 
@@ -34,6 +40,9 @@ from app.config import (
 )
 from app.mcp_search import web_search
 
+# 会话级 Agent 缓存上限（环境变量可调）
+_MAX_CACHED_SESSIONS = int(os.getenv("MAX_AGENT_SESSIONS", "200"))
+
 SYSTEM_PROMPT = """你是阿里云 ACP 认证学习助手，基于课程知识库回答学员的问题。
 
 工具使用规则：
@@ -48,8 +57,11 @@ SYSTEM_PROMPT = """你是阿里云 ACP 认证学习助手，基于课程知识�
 - 用户上传的附件内容会附在问题后，需要时优先参考。
 """
 
-_agents: dict[str, ReActAgent] = {}
-_last_session: dict[str, str] = {}
+# key = (user_id, session_id)
+_agents: "OrderedDict[tuple[str, str], ReActAgent]" = OrderedDict()
+_locks: dict[tuple[str, str], asyncio.Lock] = {}
+# 长期记忆按 user_id 共享
+_ltm: "OrderedDict[str, Mem0LongTermMemory]" = OrderedDict()
 
 
 # ─────────────────────── 工具 ───────────────────────
@@ -87,8 +99,32 @@ def _qdrant_host_port() -> tuple[str, int]:
     return u.hostname or "qdrant", u.port or 6333
 
 
-def _build_agent(user_id: str) -> ReActAgent:
+def _build_ltm(user_id: str) -> Mem0LongTermMemory:
+    """构建长期记忆（按用户）。跨会话共享，故按 user_id 缓存。"""
     host, port = _qdrant_host_port()
+    return Mem0LongTermMemory(
+        agent_name="acp_assistant",
+        user_name=user_id,
+        model=DashScopeChatModel(model_name=LLM_MODEL, api_key=DASHSCOPE_API_KEY, stream=False),
+        embedding_model=DashScopeTextEmbedding(
+            api_key=DASHSCOPE_API_KEY,
+            model_name="text-embedding-v4",
+            dimensions=MEMORY_EMBED_DIM,
+        ),
+        vector_store_config=VectorStoreConfig(
+            provider="qdrant",
+            config={
+                "collection_name": MEMORY_COLLECTION,
+                "host": host,
+                "port": port,
+                "embedding_model_dims": MEMORY_EMBED_DIM,
+                "on_disk": False,
+            },
+        ),
+    )
+
+
+def _build_toolkit() -> Toolkit:
     toolkit = Toolkit()
     toolkit.register_tool_function(
         _search_course,
@@ -134,34 +170,17 @@ def _build_agent(user_id: str) -> ReActAgent:
             },
         },
     )
+    return toolkit
 
-    long_term_memory = Mem0LongTermMemory(
-        agent_name="acp_assistant",
-        user_name=user_id,
-        model=DashScopeChatModel(model_name=LLM_MODEL, api_key=DASHSCOPE_API_KEY, stream=False),
-        embedding_model=DashScopeTextEmbedding(
-            api_key=DASHSCOPE_API_KEY,
-            model_name="text-embedding-v4",
-            dimensions=MEMORY_EMBED_DIM,
-        ),
-        vector_store_config=VectorStoreConfig(
-            provider="qdrant",
-            config={
-                "collection_name": MEMORY_COLLECTION,
-                "host": host,
-                "port": port,
-                "embedding_model_dims": MEMORY_EMBED_DIM,
-                "on_disk": False,
-            },
-        ),
-    )
 
+def _build_agent(long_term_memory: Mem0LongTermMemory) -> ReActAgent:
+    """构建单条会话的 Agent：独立短期记忆，共享该用户的长期记忆。"""
     return ReActAgent(
         name="acp_assistant",
         sys_prompt=SYSTEM_PROMPT,
         model=DashScopeChatModel(model_name=LLM_MODEL, api_key=DASHSCOPE_API_KEY, stream=True),
         formatter=DashScopeChatFormatter(),
-        toolkit=toolkit,
+        toolkit=_build_toolkit(),
         memory=InMemoryMemory(),
         long_term_memory=long_term_memory,
         long_term_memory_mode="agent_control",
@@ -169,19 +188,38 @@ def _build_agent(user_id: str) -> ReActAgent:
     )
 
 
-def _get_agent(user_id: str, session_id: str) -> ReActAgent:
-    agent = _agents.get(user_id)
-    if agent is None:
-        agent = _build_agent(user_id)
-        _agents[user_id] = agent
-    # 新会话：清空短期记忆（长期记忆跨会话保留）
-    if _last_session.get(user_id) != session_id:
-        _last_session[user_id] = session_id
-        try:
-            agent.memory.clear()
-        except Exception:
-            pass
+def _get_ltm(user_id: str) -> Mem0LongTermMemory:
+    ltm = _ltm.get(user_id)
+    if ltm is not None:
+        _ltm.move_to_end(user_id)
+        return ltm
+    ltm = _build_ltm(user_id)
+    _ltm[user_id] = ltm
+    while len(_ltm) > _MAX_CACHED_SESSIONS:
+        _ltm.popitem(last=False)
+    return ltm
+
+
+def _get_agent(key: tuple[str, str]) -> ReActAgent:
+    agent = _agents.get(key)
+    if agent is not None:
+        _agents.move_to_end(key)
+        return agent
+    user_id, _session_id = key
+    agent = _build_agent(_get_ltm(user_id))
+    _agents[key] = agent
+    while len(_agents) > _MAX_CACHED_SESSIONS:
+        old_key, _ = _agents.popitem(last=False)
+        _locks.pop(old_key, None)
     return agent
+
+
+def _get_lock(key: tuple[str, str]) -> asyncio.Lock:
+    lock = _locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _locks[key] = lock
+    return lock
 
 
 # ─────────────────────── 流式对话 ───────────────────────
@@ -220,58 +258,60 @@ async def run_chat(
     attachment_texts: list[str] | None = None,
 ) -> AsyncGenerator[dict, None]:
     """运行统一 Agent，产出流式事件 dict（step/delta/done/error）。"""
-    agent = _get_agent(user_id, session_id)
+    key = (str(user_id), session_id or "")
+    agent = _get_agent(key)
+    lock = _get_lock(key)
 
     full = message
     if attachment_texts:
         full = message + "\n\n【附件内容】\n" + "\n\n---\n\n".join(attachment_texts)
     msg = Msg(name="user", content=full, role="user")
 
-    queue: asyncio.Queue = asyncio.Queue()
-    agent.set_msg_queue_enabled(True, queue)
-    reply_task = asyncio.create_task(agent.reply(msg))
+    # 同一会话串行（防止共享 Agent 的消息队列被并发覆盖）；不同会话各持各的锁，天然并行。
+    async with lock:
+        queue: asyncio.Queue = asyncio.Queue()
+        agent.set_msg_queue_enabled(True, queue)
+        reply_task = asyncio.create_task(agent.reply(msg))
 
-    emitted_len = 0      # 当前消息已发出的文本长度（消息内容是累计的）
-    last_msg_id = None   # 用于识别新消息，切换时重置 emitted_len
-    last_step_text = None  # 去重：流式下同一 tool 块会随多个 chunk 重复推送
-    try:
-        while True:
-            try:
-                item = await asyncio.wait_for(queue.get(), timeout=0.5)
-            except asyncio.TimeoutError:
-                if reply_task.done():
-                    break
-                continue
+        emitted_len = 0        # 当前消息已发出的文本长度（消息内容是累计的）
+        last_msg_id = None     # 用于识别新消息，切换时重置 emitted_len
+        last_step_text = None  # 去重：流式下同一 tool 块会随多个 chunk 重复推送
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    if reply_task.done():
+                        break
+                    continue
 
-            m, _last, _speech = item  # 队列项为 (msg, last, speech) 三元组
-            mid = getattr(m, "id", None)
-            if mid != last_msg_id:
-                last_msg_id = mid
-                emitted_len = 0
+                m, _last, _speech = item  # 队列项为 (msg, last, speech) 三元组
+                mid = getattr(m, "id", None)
+                if mid != last_msg_id:
+                    last_msg_id = mid
+                    emitted_len = 0
 
-            step = _msg_step(m)
-            if step and step["text"] != last_step_text:
-                yield step
-                last_step_text = step["text"]
+                step = _msg_step(m)
+                if step and step["text"] != last_step_text:
+                    yield step
+                    last_step_text = step["text"]
 
-            text = _msg_text(m)
+                text = _msg_text(m)
+                if len(text) > emitted_len:
+                    yield {"type": "delta", "text": text[emitted_len:]}
+                    emitted_len = len(text)
+
+            if reply_task.exception():
+                yield {"type": "error", "text": str(reply_task.exception())}
+                return
+
+            final = reply_task.result()
+            text = _msg_text(final)
             if len(text) > emitted_len:
                 yield {"type": "delta", "text": text[emitted_len:]}
-                emitted_len = len(text)
-    except Exception as exc:  # noqa: BLE001
-        yield {"type": "error", "text": str(exc)}
-        return
-    finally:
-        if not reply_task.done():
-            reply_task.cancel()
-            return
-
-    if reply_task.exception():
-        yield {"type": "error", "text": str(reply_task.exception())}
-        return
-
-    final = reply_task.result()
-    text = _msg_text(final)
-    if len(text) > emitted_len:
-        yield {"type": "delta", "text": text[emitted_len:]}
-    yield {"type": "done", "done": True}
+            yield {"type": "done", "done": True}
+        except Exception as exc:  # noqa: BLE001
+            yield {"type": "error", "text": str(exc)}
+        finally:
+            if not reply_task.done():
+                reply_task.cancel()
