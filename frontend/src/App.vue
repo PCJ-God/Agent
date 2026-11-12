@@ -267,6 +267,9 @@ async function doUnbindFeishu() {
         {{ authBusy ? '请稍候…' : authMode === 'login' ? '登录' : '注册并登录' }}
       </button>
     </form>
+    <footer class="icp auth-icp">
+      <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer">皖ICP备2026033975号</a>
+    </footer>
   </div>
 
   <div v-else class="layout">
@@ -362,13 +365,17 @@ async function doUnbindFeishu() {
         <p v-if="feishuMsg" class="admin-msg">{{ feishuMsg }}</p>
       </section>
     </main>
+
+    <footer class="icp">
+      <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer">皖ICP备2026033975号</a>
+    </footer>
   </div>
 </template>
 
 <style scoped>
 * { box-sizing: border-box; }
 .app, .auth, .layout { font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
-.auth { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0f172a; color: #e2e8f0; }
+.auth { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0f172a; color: #e2e8f0; }
 .card { background: #1e293b; padding: 32px; border-radius: 14px; width: 340px; display: flex; flex-direction: column; gap: 10px; }
 .card h1 { margin: 0; font-size: 22px; }
 .card .sub { margin: 0 0 8px; color: #94a3b8; font-size: 13px; }
@@ -421,6 +428,13 @@ nav button.on { background: #2563eb; border-color: #2563eb; color: #fff; }
 .bind-row input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font: inherit; font-size: 15px; }
 .danger { border-color: #dc2626; color: #dc2626; }
 .ok-hint { color: #16a34a !important; font-weight: 600; }
+
+/* 备案号页脚 */
+.icp { text-align: center; font-size: 12px; color: #94a3b8; padding: 8px 0; }
+.icp a { color: inherit; text-decoration: none; }
+.icp a:hover { text-decoration: underline; }
+.layout > .icp { border-top: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; }
+.auth-icp { position: absolute; bottom: 12px; left: 0; right: 0; }
 
 /* Markdown 正文样式（v-html 内容需用 :deep 穿透 scoped） */
 .markdown-body { white-space: normal; }
